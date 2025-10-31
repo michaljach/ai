@@ -6,12 +6,17 @@
 //
 
 import SwiftUI
+import ComposableArchitecture
 
 @main
 struct lamaApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
+  var body: some Scene {
+    WindowGroup {
+      MainView(
+        store: Store(initialState: Main.State()) {
+          Main()
         }
+      )
     }
+  }
 }
