@@ -12,9 +12,9 @@ import ComposableArchitecture
 struct lamaApp: App {
   var body: some Scene {
     WindowGroup {
-      MainView(
-        store: Store(initialState: Main.State()) {
-          Main()
+      ChatListView(
+        store: Store(initialState: ChatList.State()) {
+          ChatList()
         }
       )
     }

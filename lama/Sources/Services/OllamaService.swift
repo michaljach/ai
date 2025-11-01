@@ -16,7 +16,7 @@ actor OllamaService {
   /// - Parameters:
   ///   - baseURL: The base URL for the Ollama API (default: http://192.168.68.55:11434)
   ///   - urlSession: Optional custom URLSession for testing
-  init(baseURL: String = "http://192.168.68.55:11434", urlSession: URLSession = .shared) {
+  init(baseURL: String = "http://192.168.68.54:11434", urlSession: URLSession = .shared) {
     self.baseURL = baseURL
     self.urlSession = urlSession
   }
