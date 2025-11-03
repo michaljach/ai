@@ -19,16 +19,36 @@ struct ChatListView: View {
         } else {
           List {
             ForEach(store.chats) { chat in
-              NavigationLink(
-                "New chat",
-                state: ChatList.Path.State.chat(Chat.State(id: chat.id))
-              )
+              NavigationLink(state: ChatList.Path.State.chat(chat)) {
+                VStack(alignment: .leading, spacing: 4) {
+                  Text(chat.title)
+                    .font(.headline)
+                  if !chat.messages.isEmpty {
+                    Text("\(chat.messages.count) message\(chat.messages.count == 1 ? "" : "s")")
+                      .font(.caption)
+                      .foregroundStyle(.secondary)
+                  }
+                }
+                .padding(.vertical, 4)
+              }
+            }
+            .onDelete { indexSet in
+              for index in indexSet {
+                let chat = store.chats[index]
+                store.send(.deleteChat(chat.id))
+              }
             }
           }
         }
       }
       .navigationTitle("Chats")
       .toolbar {
+        ToolbarItem(placement: .navigationBarLeading) {
+          Button(action: { store.send(.settingsButtonTapped) }) {
+            Image(systemName: "gear")
+          }
+        }
+
         ToolbarItem(placement: .primaryAction) {
           Button(action: { store.send(.newChatButtonTapped) }) {
             Image(systemName: "plus")
@@ -39,6 +59,8 @@ struct ChatListView: View {
       switch store.case {
       case let .chat(store):
         ChatView(store: store)
+      case let .settings(store):
+        SettingsView(store: store)
       }
     }
   }

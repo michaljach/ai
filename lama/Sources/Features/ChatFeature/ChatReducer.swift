@@ -15,39 +15,102 @@ struct Chat {
   @ObservableState
   struct State: Equatable, Identifiable {
     let id: UUID
-    var model: String = "gemma3:4b"
+    var model: String
+    var availableModels: [String] = []
+    var isLoadingModels: Bool = false
     var errorMessage: String?
     var isLoading: Bool = false
     var messages: IdentifiedArrayOf<Message.State> = []
     var messageInputState = MessageInput.State()
+    var isUserScrolling: Bool = false
+
+    init(id: UUID) {
+      self.id = id
+      // Load default model from settings
+      if let savedModel = UserDefaults.standard.string(forKey: "defaultModel"), !savedModel.isEmpty {
+        self.model = savedModel
+      } else {
+        self.model = "gemma3:4b"
+      }
+    }
+
+    /// Computed property for chat title based on first user message
+    var title: String {
+      // Find the first user message
+      if let firstUserMessage = messages.first(where: { $0.role == .user }) {
+        let content = firstUserMessage.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Limit to first 50 characters
+        if content.count > 50 {
+          return String(content.prefix(50)) + "..."
+        }
+        return content.isEmpty ? "New Chat" : content
+      }
+      return "New Chat"
+    }
   }
-  
+
   enum Action {
     case messages(IdentifiedActionOf<Message>)
     case messageInput(MessageInput.Action)
     case onAppear
+    case modelSelected(String)
+    case loadModels
+    case modelsLoaded([String])
+    case modelsLoadError(String)
     case streamingResponseReceived(String)
     case streamingComplete
     case streamingError(String)
+    case userDidScroll
+    case scrollToBottomTapped
   }
   
   var body: some Reducer<State, Action> {
     Reduce { state, action in
       switch action {
       case .onAppear:
+        return .send(.loadModels)
+
+      case .loadModels:
+        state.isLoadingModels = true
+        return .run { send in
+          do {
+            let response = try await ollamaService.listModels()
+            let modelNames = response.models.map { $0.name }
+            await send(.modelsLoaded(modelNames))
+          } catch {
+            await send(.modelsLoadError(error.localizedDescription))
+          }
+        }
+
+      case .modelsLoaded(let models):
+        state.isLoadingModels = false
+        state.availableModels = models
+        // If current model is not in the list and there are models, select the first one
+        if !models.isEmpty && !models.contains(state.model) {
+          state.model = models[0]
+        }
         return .none
-        
+
+      case .modelsLoadError(let error):
+        state.isLoadingModels = false
+        // Silently fail - keep the default model
+        return .none
+
+      case .modelSelected(let model):
+        state.model = model
+        return .none
+
       case .messageInput(.delegate(.sendMessage)):
         let inputText = state.messageInputState.inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !inputText.isEmpty else {
           return .none
         }
-        
+
         // Clear input
         state.messageInputState.inputText = ""
         state.messageInputState.isLoading = true
         state.errorMessage = nil
-        
+
         // Add user message
         let userMessageId = UUID()
         let userMessage = Message.State(
@@ -123,8 +186,16 @@ struct Chat {
         
       case .messageInput:
         return .none
-        
+
       case .messages:
+        return .none
+
+      case .userDidScroll:
+        state.isUserScrolling = true
+        return .none
+
+      case .scrollToBottomTapped:
+        state.isUserScrolling = false
         return .none
       }
     }

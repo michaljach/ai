@@ -16,8 +16,8 @@ struct MessageView: View {
       if store.role == .user {
         HStack {
           Spacer()
-          
-          Text(store.content)
+
+          Text(.init(store.content))
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(Color.blue)
@@ -26,7 +26,8 @@ struct MessageView: View {
         }
         .padding()
       } else {
-        Text(store.content)
+        Text(.init(store.content))
+          .textSelection(.enabled)
           .padding(.horizontal)
       }
     }

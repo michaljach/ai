@@ -9,16 +9,21 @@ import Foundation
 
 /// Service for interacting with the Ollama API
 actor OllamaService {
-  private let baseURL: String
   private let urlSession: URLSession
-  
+
   /// Initialize the Ollama service
   /// - Parameters:
-  ///   - baseURL: The base URL for the Ollama API (default: http://192.168.68.55:11434)
   ///   - urlSession: Optional custom URLSession for testing
-  init(baseURL: String = "http://192.168.68.54:11434", urlSession: URLSession = .shared) {
-    self.baseURL = baseURL
+  init(urlSession: URLSession = .shared) {
     self.urlSession = urlSession
+  }
+
+  /// Get the base URL from settings or use default
+  private var baseURL: String {
+    if let savedEndpoint = UserDefaults.standard.string(forKey: "ollamaEndpoint"), !savedEndpoint.isEmpty {
+      return savedEndpoint
+    }
+    return "http://192.168.68.54:11434"
   }
   
   // MARK: - Chat Completion

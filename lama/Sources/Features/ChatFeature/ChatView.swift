@@ -9,50 +9,90 @@ import ComposableArchitecture
 import SwiftUI
 
 struct ChatView: View {
-  var store: StoreOf<Chat>
-  
+  @Bindable var store: StoreOf<Chat>
+  @State private var isAtBottom: Bool = true
+
   var body: some View {
     VStack(spacing: 0) {
       // Messages List
       ScrollViewReader { proxy in
-        ScrollView {
-          LazyVStack(alignment: .leading, spacing: 12) {
-            ForEach(store.scope(state: \.messages, action: \.messages)) { store in
-              MessageView(store: store)
-            }
-            
-            if store.isLoading {
-              HStack {
-                ProgressView()
-                  .scaleEffect(0.8)
-                Text("Thinking...")
-                  .font(.caption)
-                  .foregroundStyle(.secondary)
+        ZStack(alignment: .bottomTrailing) {
+          ScrollView {
+            LazyVStack(alignment: .leading, spacing: 12) {
+              ForEach(store.scope(state: \.messages, action: \.messages)) { store in
+                MessageView(store: store)
+                  .id(store.id)
               }
-              .padding(.horizontal)
-            }
-            
-            if let error = store.errorMessage {
-              Text("Error: \(error)")
-                .font(.caption)
-                .foregroundColor(.red)
+
+              if store.isLoading {
+                HStack {
+                  ProgressView()
+                    .scaleEffect(0.8)
+                  Text("Thinking...")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
                 .padding(.horizontal)
+                .id("loading")
+              }
+
+              if let error = store.errorMessage {
+                Text("Error: \(error)")
+                  .font(.caption)
+                  .foregroundColor(.red)
+                  .padding(.horizontal)
+              }
+
+              Color.clear
+                .frame(height: 1)
+                .id("bottom")
+                .onAppear {
+                  isAtBottom = true
+                }
+                .onDisappear {
+                  isAtBottom = false
+                  if !store.isUserScrolling {
+                    store.send(.userDidScroll)
+                  }
+                }
+            }
+            .padding()
+          }
+          .onChange(of: store.messages.count) { oldCount, newCount in
+            if !store.isUserScrolling || isAtBottom {
+              withAnimation(.easeOut(duration: 0.3)) {
+                proxy.scrollTo("bottom", anchor: .bottom)
+              }
             }
           }
-          .padding()
-        }
-        .onChange(of: store.messages.count) { oldCount, newCount in
-          if let lastMessageState = store.messages.last {
-            withAnimation {
-              proxy.scrollTo(lastMessageState.id, anchor: .bottom)
+          .onChange(of: store.isLoading) { _, isLoading in
+            if isLoading && (!store.isUserScrolling || isAtBottom) {
+              withAnimation(.easeOut(duration: 0.3)) {
+                proxy.scrollTo("bottom", anchor: .bottom)
+              }
             }
           }
-        }
-        .onChange(of: store.isLoading) { _, isLoading in
-          if isLoading, let lastMessageState = store.messages.last {
-            withAnimation {
-              proxy.scrollTo(lastMessageState.id, anchor: .bottom)
+          .onChange(of: store.messages.last?.content) { _, _ in
+            if !store.isUserScrolling || isAtBottom {
+              proxy.scrollTo("bottom", anchor: .bottom)
             }
+          }
+
+          // Floating scroll to bottom button
+          if store.isUserScrolling && !isAtBottom {
+            Button {
+              store.send(.scrollToBottomTapped)
+              withAnimation(.easeOut(duration: 0.3)) {
+                proxy.scrollTo("bottom", anchor: .bottom)
+              }
+            } label: {
+              Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 36))
+                .foregroundStyle(.white, .blue)
+                .shadow(radius: 4)
+            }
+            .padding()
+            .transition(.scale.combined(with: .opacity))
           }
         }
       }
@@ -61,6 +101,13 @@ struct ChatView: View {
       MessageInputView(
         store: store.scope(state: \.messageInputState, action: \.messageInput)
       )
+    }
+    .navigationTitle("Chat")
+    .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .principal) {
+        ModelPicker(store: store)
+      }
     }
     .onAppear {
       store.send(.onAppear)
