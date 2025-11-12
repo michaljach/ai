@@ -15,7 +15,7 @@ struct ChatView: View {
     VStack(spacing: 0) {
       // Messages List
       ScrollView {
-        LazyVStack(alignment: .leading, spacing: 12) {
+        LazyVStack(alignment: .leading, spacing: 0) {
           ForEach(store.scope(state: \.messages, action: \.messages)) { store in
             MessageView(store: store)
               .id(store.id)
@@ -29,13 +29,14 @@ struct ChatView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
+            .padding()
             .id("loading")
           }
 
           if let error = store.errorMessage {
             Text("Error: \(error)")
               .font(.caption)
-              .foregroundColor(.secondary)
+              .foregroundColor(.red)
               .padding(.horizontal)
           }
 

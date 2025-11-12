@@ -25,13 +25,12 @@ struct MessageView: View {
             .foregroundColor(.white)
             .clipShape(RoundedRectangle(cornerRadius: 24))
         }
-        .padding()
       } else {
         Markdown(store.content)
-          .padding(.horizontal)
           .textSelection(.enabled)
       }
     }
+    .padding()
     // Avoid off-screen rasterization which can hurt scrolling performance
   }
 }
