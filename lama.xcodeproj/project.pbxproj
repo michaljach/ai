@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		827952BC2EB56CB90073D4C9 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = 827952BB2EB56CB90073D4C9 /* ComposableArchitecture */; };
+		82E1DC832EC528C300EBED58 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 82E1DC822EC528C300EBED58 /* MarkdownUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				827952BC2EB56CB90073D4C9 /* ComposableArchitecture in Frameworks */,
+				82E1DC832EC528C300EBED58 /* MarkdownUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +73,7 @@
 			name = lama;
 			packageProductDependencies = (
 				827952BB2EB56CB90073D4C9 /* ComposableArchitecture */,
+				82E1DC822EC528C300EBED58 /* MarkdownUI */,
 			);
 			productName = lama;
 			productReference = 827952AC2EB56B760073D4C9 /* lama.app */;
@@ -102,6 +105,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				827952BA2EB56CB90073D4C9 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */,
+				82E1DC812EC528C300EBED58 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 827952AD2EB56B760073D4C9 /* Products */;
@@ -353,6 +357,14 @@
 				minimumVersion = 1.23.1;
 			};
 		};
+		82E1DC812EC528C300EBED58 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.4.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -360,6 +372,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 827952BA2EB56CB90073D4C9 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
 			productName = ComposableArchitecture;
+		};
+		82E1DC822EC528C300EBED58 /* MarkdownUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 82E1DC812EC528C300EBED58 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
+			productName = MarkdownUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

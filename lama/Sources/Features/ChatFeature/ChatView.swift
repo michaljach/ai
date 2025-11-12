@@ -14,85 +14,44 @@ struct ChatView: View {
   var body: some View {
     VStack(spacing: 0) {
       // Messages List
-      ScrollViewReader { proxy in
-        ZStack(alignment: .bottomTrailing) {
-          ScrollView {
-            LazyVStack(alignment: .leading, spacing: 12) {
-              ForEach(store.scope(state: \.messages, action: \.messages)) { store in
-                MessageView(store: store)
-                  .id(store.id)
-              }
-
-              if store.isLoading {
-                HStack {
-                  ProgressView()
-                    .scaleEffect(0.8)
-                  Text("Thinking...")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal)
-                .id("loading")
-              }
-
-              if let error = store.errorMessage {
-                Text("Error: \(error)")
-                  .font(.caption)
-                  .foregroundColor(.red)
-                  .padding(.horizontal)
-              }
-
-              Color.clear
-                .frame(height: 1)
-                .id("bottom")
-                .onAppear {
-                  store.send(.bottomAppeared)
-                }
-                .onDisappear {
-                  store.send(.bottomDisappeared)
-                }
-            }
-            .padding()
-          }
-          .scrollDismissesKeyboard(.interactively)
-          .onChange(of: store.messages.count) { oldCount, newCount in
-            if !store.isUserScrolling || store.isAtBottom {
-              withAnimation(.easeOut(duration: 0.3)) {
-                proxy.scrollTo("bottom", anchor: .bottom)
-              }
-            }
-          }
-          .onChange(of: store.isLoading) { _, isLoading in
-            if isLoading && (!store.isUserScrolling || store.isAtBottom) {
-              withAnimation(.easeOut(duration: 0.3)) {
-                proxy.scrollTo("bottom", anchor: .bottom)
-              }
-            }
-          }
-          .onChange(of: store.messages.last?.content) { _, _ in
-            if !store.isUserScrolling || store.isAtBottom {
-              proxy.scrollTo("bottom", anchor: .bottom)
-            }
+      ScrollView {
+        LazyVStack(alignment: .leading, spacing: 12) {
+          ForEach(store.scope(state: \.messages, action: \.messages)) { store in
+            MessageView(store: store)
+              .id(store.id)
           }
 
-          // Floating scroll to bottom button
-          if store.isUserScrolling && !store.isAtBottom {
-            Button {
-              store.send(.scrollToBottomTapped)
-              withAnimation(.easeOut(duration: 0.3)) {
-                proxy.scrollTo("bottom", anchor: .bottom)
-              }
-            } label: {
-              Image(systemName: "arrow.down.circle.fill")
-                .font(.system(size: 36))
-                .foregroundStyle(.white, .blue)
-                .shadow(radius: 4)
+          if store.isLoading {
+            HStack {
+              ProgressView()
+                .scaleEffect(0.8)
+              Text("Thinking...")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
-            .padding()
-            .transition(.scale.combined(with: .opacity))
+            .id("loading")
           }
+
+          if let error = store.errorMessage {
+            Text("Error: \(error)")
+              .font(.caption)
+              .foregroundColor(.secondary)
+              .padding(.horizontal)
+          }
+
+          Color.clear
+            .frame(height: 1)
+            .id("bottom")
         }
+        .scrollTargetLayout()
+//        .padding()
       }
+      .scrollDismissesKeyboard(.interactively)
+      .defaultScrollAnchor(.bottom)
+      // .scrollPosition(id: Binding(
+      //   get: { store.scrollPosition },
+      //   set: { store.send(.scrollPositionChanged($0)) }
+      // ))
       
       // Input
       MessageInputView(
@@ -122,7 +81,28 @@ struct ChatView: View {
 
 #Preview {
   ChatView(
-    store: Store(initialState: Chat.State(id: UUID())) {
+    store: Store(initialState: {
+      var state = Chat.State(id: UUID())
+      state.messages = [
+        Message.State(
+          role: .user,
+          content: "Write a short haiku about the sea."
+        ),
+        Message.State(
+          role: .assistant,
+          content: "Blue waves whisper low\nMoonlight dances on the foam\nNight keeps its secrets."
+        ),
+        Message.State(
+          role: .user,
+          content: "Now summarize it in one line."
+        ),
+        Message.State(
+          role: .assistant,
+          content: "Moonlit waves softly whisper secrets."
+        )
+      ]
+      return state
+    }()) {
       Chat()
     }
   )

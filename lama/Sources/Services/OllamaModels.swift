@@ -189,6 +189,8 @@ struct ChatOptions {
   let topK: Int?
   let repeatPenalty: Double?
   let seed: Int?
+  // The maximum number of tokens to predict (Ollama option: num_predict)
+  let numPredict: Int?
   
   enum CodingKeys: String, CodingKey {
     case temperature
@@ -196,6 +198,7 @@ struct ChatOptions {
     case topK = "top_k"
     case repeatPenalty = "repeat_penalty"
     case seed
+    case numPredict = "num_predict"
   }
   
   init(
@@ -203,13 +206,15 @@ struct ChatOptions {
     topP: Double? = nil,
     topK: Int? = nil,
     repeatPenalty: Double? = nil,
-    seed: Int? = nil
+    seed: Int? = nil,
+    numPredict: Int? = nil
   ) {
     self.temperature = temperature
     self.topP = topP
     self.topK = topK
     self.repeatPenalty = repeatPenalty
     self.seed = seed
+    self.numPredict = numPredict
   }
 }
 
@@ -221,6 +226,8 @@ struct GenerateOptions {
   let topK: Int?
   let repeatPenalty: Double?
   let seed: Int?
+  // The maximum number of tokens to predict (Ollama option: num_predict)
+  let numPredict: Int?
   
   enum CodingKeys: String, CodingKey {
     case temperature
@@ -228,6 +235,7 @@ struct GenerateOptions {
     case topK = "top_k"
     case repeatPenalty = "repeat_penalty"
     case seed
+    case numPredict = "num_predict"
   }
   
   init(
@@ -235,13 +243,15 @@ struct GenerateOptions {
     topP: Double? = nil,
     topK: Int? = nil,
     repeatPenalty: Double? = nil,
-    seed: Int? = nil
+    seed: Int? = nil,
+    numPredict: Int? = nil
   ) {
     self.temperature = temperature
     self.topP = topP
     self.topK = topK
     self.repeatPenalty = repeatPenalty
     self.seed = seed
+    self.numPredict = numPredict
   }
 }
 

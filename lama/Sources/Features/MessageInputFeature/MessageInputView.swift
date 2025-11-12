@@ -46,7 +46,8 @@ struct MessageInputView: View {
       }
     }
     .padding(.vertical, 12)
-    .padding(.horizontal, 24)
+    .padding(.leading, 18)
+    .padding(.trailing, 12)
     .background(.colorGray)
     .clipShape(Capsule())
     .padding()

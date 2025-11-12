@@ -27,8 +27,7 @@ struct Chat {
     var isLoading: Bool = false
     var messages: IdentifiedArrayOf<Message.State> = []
     var messageInputState = MessageInput.State()
-    var isUserScrolling: Bool = false
-    var isAtBottom: Bool = true
+    var scrollPosition: String?
 
     init(id: UUID, userDefaultsService: UserDefaultsService = .liveValue) {
       self.id = id
@@ -64,10 +63,7 @@ struct Chat {
     case streamingComplete
     case streamingError(String)
     case stopGeneration
-    case userDidScroll
-    case scrollToBottomTapped
-    case bottomAppeared
-    case bottomDisappeared
+    case scrollPositionChanged(String?)
   }
   
   var body: some Reducer<State, Action> {
@@ -155,62 +151,69 @@ struct Chat {
         )
         state.messages.append(assistantMessage)
         state.isLoading = true
+        // Force a new scroll event by clearing, then sending an update
+        state.scrollPosition = nil
         
-        // Start streaming request
-        return .run { [model = state.model] send in
-          do {
-            let stream = try await ollamaService.chat(
-              model: model,
-              messages: chatMessages
-            )
-            
-            for try await response in stream {
-              // Check if cancellation was requested
-              if Task.isCancelled {
+        // Also trigger scroll to bottom right after appending the assistant placeholder
+        // Prepare generation options from settings
+        let temperature = userDefaultsService.getTemperature()
+        let maxTokens = userDefaultsService.getMaxTokens()
+        let options = ChatOptions(temperature: temperature, numPredict: maxTokens)
+
+        return .merge(
+          .send(.scrollPositionChanged("bottom")),
+          .run { [model = state.model, options] send in
+            do {
+              let stream = try await ollamaService.chat(
+                model: model,
+                messages: chatMessages,
+                options: options
+              )
+              for try await response in stream {
+                if Task.isCancelled {
+                  await send(.streamingComplete)
+                  break
+                }
+                if let messageContent = response.message?.content {
+                  await send(.streamingResponseReceived(messageContent))
+                }
+                if response.done == true {
+                  await send(.streamingComplete)
+                  break
+                }
+              }
+            } catch {
+              if !Task.isCancelled {
+                await send(.streamingError(error.localizedDescription))
+              } else {
                 await send(.streamingComplete)
-                break
               }
-              
-              if let messageContent = response.message?.content {
-                await send(.streamingResponseReceived(messageContent))
-              }
-              
-              if response.done == true {
-                await send(.streamingComplete)
-                break
-              }
-            }
-          } catch {
-            // Only send error if not cancelled
-            if !Task.isCancelled {
-              await send(.streamingError(error.localizedDescription))
-            } else {
-              await send(.streamingComplete)
             }
           }
-        }
-        .cancellable(id: CancelID.streaming)
+          .cancellable(id: CancelID.streaming)
+        )
         
       case .streamingResponseReceived(let content):
         // Update the last message (assistant message) with streaming content
         if let lastIndex = state.messages.indices.last,
            state.messages[lastIndex].role == .assistant {
           state.messages[lastIndex].content += content
+          // Scroll to bottom periodically during streaming to reduce frequency
+          if state.messages[lastIndex].content.count % 80 < content.count {
+            // Force a new scroll event by toggling the binding value
+            state.scrollPosition = nil
+            return .send(.scrollPositionChanged("bottom"))
+          }
         }
         return .none
         
       case .streamingComplete:
         state.isLoading = false
         state.messageInputState.isLoading = false
+        // Ensure we end at the bottom
+        state.scrollPosition = nil
+        return .send(.scrollPositionChanged("bottom"))
         
-        // Debug: Print final state of messages
-        print("✅ Streaming complete. Total messages in state: \(state.messages.count)")
-        for (index, msg) in state.messages.enumerated() {
-          let preview = msg.content.prefix(50)
-          print("  \(index + 1). [\(msg.role)] \(preview)...")
-        }
-        
-        return .none
         
       case .streamingError(let errorMessage):
         state.isLoading = false
@@ -238,24 +241,8 @@ struct Chat {
       case .messages:
         return .none
 
-      case .userDidScroll:
-        state.isUserScrolling = true
-        return .none
-
-      case .scrollToBottomTapped:
-        state.isUserScrolling = false
-        state.isAtBottom = true
-        return .none
-
-      case .bottomAppeared:
-        state.isAtBottom = true
-        return .none
-
-      case .bottomDisappeared:
-        state.isAtBottom = false
-        if !state.isUserScrolling {
-          return .send(.userDidScroll)
-        }
+      case .scrollPositionChanged(let position):
+        state.scrollPosition = position
         return .none
       }
     }

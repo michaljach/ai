@@ -7,6 +7,7 @@
 
 import ComposableArchitecture
 import SwiftUI
+import MarkdownUI
 
 struct MessageView: View {
   var store: StoreOf<Message>
@@ -17,7 +18,7 @@ struct MessageView: View {
         HStack {
           Spacer()
 
-          Text(.init(store.content))
+          Text(store.content)
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(Color.blue)
@@ -26,11 +27,12 @@ struct MessageView: View {
         }
         .padding()
       } else {
-        Text(.init(store.content))
-          .textSelection(.enabled)
+        Markdown(store.content)
           .padding(.horizontal)
+          .textSelection(.enabled)
       }
     }
+    // Avoid off-screen rasterization which can hurt scrolling performance
   }
 }
 
