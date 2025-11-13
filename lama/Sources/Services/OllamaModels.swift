@@ -9,6 +9,17 @@ import Foundation
 
 // MARK: - Request Models
 
+// Default system prompt for all user messages
+let defaultSystemPrompt = "You are a helpful assistant. Always answer concisely and politely. Format responses for mobile in markdown. Do NOT render tables unless the user explicitly requests a table. If information is best shown in a table, describe it in text instead, unless asked for a table."
+
+extension Array where Element == ChatMessage {
+  /// Prepends the default system prompt as a system message if not already present
+  func withDefaultSystemPrompt() -> [ChatMessage] {
+    if let first = self.first, first.role == .system { return self }
+    return [ChatMessage(role: .system, content: defaultSystemPrompt)] + self
+  }
+}
+
 struct ChatRequest {
   let model: String
   let messages: [ChatMessage]
