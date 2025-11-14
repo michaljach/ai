@@ -14,44 +14,53 @@ struct ChatView: View {
   var body: some View {
     VStack(spacing: 0) {
       // Messages List
-      ScrollView {
-        LazyVStack(alignment: .leading, spacing: 0) {
-          ForEach(store.scope(state: \.visibleMessages, action: \.messages)) { store in
-            MessageView(store: store)
-              .id(store.id)
-          }
+      ScrollViewReader { proxy in
+        ScrollView {
+          LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(store.scope(state: \.visibleMessages, action: \.messages)) { store in
+              MessageView(store: store)
+                .id(store.id)
+            }
 
-          // Loading indicator based on state
-          switch store.loadingState {
-          case .loading:
-            LoadingIndicatorView(text: "Thinking...")
-              .padding()
-              .id("loading")
-            
-          case .searchingWeb:
-            LoadingIndicatorView(text: "Searching the web...")
-              .padding()
-              .id("searching")
-            
-          case .idle:
-            EmptyView()
-          }
+            // Loading indicator based on state
+            switch store.loadingState {
+            case .loading:
+              LoadingIndicatorView(text: "Thinking...")
+                .padding()
+                .id("loading")
+              
+            case .searchingWeb:
+              LoadingIndicatorView(text: "Searching the web...")
+                .padding()
+                .id("searching")
+              
+            case .idle:
+              EmptyView()
+            }
 
-          if let error = store.errorMessage {
-            Text("Error: \(error)")
-              .font(.caption)
-              .foregroundColor(.red)
-              .padding(.horizontal)
-          }
+            if let error = store.errorMessage {
+              Text("Error: \(error)")
+                .font(.caption)
+                .foregroundColor(.red)
+                .padding(.horizontal)
+            }
 
-          Color.clear
-            .frame(height: 1)
-            .id("bottom")
+            Color.clear
+              .frame(height: 1)
+              .id("bottom")
+          }
+          .scrollTargetLayout()
         }
-        .scrollTargetLayout()
+        .scrollDismissesKeyboard(.interactively)
+        .defaultScrollAnchor(.bottom)
+        .onChange(of: store.scrollPosition) { _, newValue in
+          if let position = newValue {
+            withAnimation(.easeOut(duration: 0.25)) {
+              proxy.scrollTo(position, anchor: .bottom)
+            }
+          }
+        }
       }
-      .scrollDismissesKeyboard(.interactively)
-      .defaultScrollAnchor(.bottom)
       
       MessageInputView(
         store: store.scope(state: \.messageInputState, action: \.messageInput)

@@ -14,10 +14,8 @@ struct LoadingIndicatorView: View {
   var body: some View {
     HStack(spacing: 6) {
       ProgressView()
-        .scaleEffect(0.8)
       
       Text(text)
-        .font(.caption)
         .foregroundStyle(.secondary)
         .overlay(
           LinearGradient(
@@ -32,7 +30,6 @@ struct LoadingIndicatorView: View {
           .offset(x: gradientOffset * 150)
           .mask(
             Text(text)
-              .font(.caption)
           )
         )
     }

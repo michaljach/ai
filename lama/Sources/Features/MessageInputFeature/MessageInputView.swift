@@ -31,7 +31,7 @@ struct MessageInputView: View {
         } label: {
           Image(systemName: "stop.circle.fill")
             .font(.title)
-            .foregroundColor(.blue)
+            .foregroundColor(.white)
         }
       } else {
         Button {
