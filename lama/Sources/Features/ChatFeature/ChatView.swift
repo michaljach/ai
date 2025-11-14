@@ -24,26 +24,14 @@ struct ChatView: View {
           // Loading indicator based on state
           switch store.loadingState {
           case .loading:
-            HStack {
-              ProgressView()
-                .scaleEffect(0.8)
-              Text("Thinking...")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-            .padding()
-            .id("loading")
+            LoadingIndicatorView(text: "Thinking...")
+              .padding()
+              .id("loading")
             
           case .searchingWeb:
-            HStack {
-              ProgressView()
-                .scaleEffect(0.8)
-              Text("Searching the web...")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-            .padding()
-            .id("searching")
+            LoadingIndicatorView(text: "Searching the web...")
+              .padding()
+              .id("searching")
             
           case .idle:
             EmptyView()
