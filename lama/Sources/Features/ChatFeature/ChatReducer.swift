@@ -146,7 +146,7 @@ struct Chat {
         // Convert existing messages (including the user message we just added) to ChatMessage format for Ollama
         let chatMessages = state.messages.map { message in
           ChatMessage(role: message.role, content: message.content)
-        }
+        }.withDefaultSystemPrompt()
 
         // Force a new scroll event by clearing, then sending an update
         state.scrollPosition = nil
@@ -293,7 +293,7 @@ struct Chat {
         // Convert messages including the tool result for the API call
         let chatMessages = state.messages.map { message in
           ChatMessage(role: message.role, content: message.content)
-        }
+        }.withDefaultSystemPrompt()
         
         return .send(.startChatStream(chatMessages))
         
