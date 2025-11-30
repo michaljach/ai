@@ -66,6 +66,9 @@ struct ChatListView: View {
         SettingsView(store: store)
       }
     }
+    .onAppear {
+      store.send(.initialize)
+    }
   }
 }
 

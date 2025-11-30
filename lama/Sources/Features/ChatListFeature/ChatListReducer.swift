@@ -26,6 +26,7 @@ struct ChatList {
     case newChatButtonTapped
     case settingsButtonTapped
     case removeEmptyChats
+    case initialize
     case deleteChat(Chat.State.ID)
     case chats(IdentifiedActionOf<Chat>)
     case path(StackActionOf<Path>)
@@ -34,6 +35,11 @@ struct ChatList {
   var body: some Reducer<State, Action> {
     Reduce { state, action in
       switch action {
+      case .initialize:
+        return .run { send in
+          await send(.newChatButtonTapped)
+        }
+        
       case let .path(.element(id: id, action: .chat(chatAction))):
         // Sync changes from path chat to the chats collection
         if let pathChat = state.path[id: id]?.chat {
