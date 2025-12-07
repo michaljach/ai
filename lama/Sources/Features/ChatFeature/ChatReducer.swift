@@ -68,6 +68,8 @@ struct Chat {
     case loadModels
     case modelsLoaded([String])
     case modelsLoadError(String)
+    case performWebSearch(String)
+    case webSearchComplete(String)
     case startChatStream([ChatMessage])
     case streamingResponseReceived(String)
     case streamingComplete(reason: String?)
@@ -133,6 +135,7 @@ struct Chat {
         state.errorMessage = nil
         state.loadingState = .loading
         state.messageInputState.isLoading = true
+        state.messageInputState.isBlocked = true
         
         // Add user message
         let userMessageId = UUID()
@@ -153,8 +156,46 @@ struct Chat {
         
         return .merge(
           .send(.scrollPositionChanged("bottom")),
-          .send(.startChatStream(chatMessages))
+          .send(.performWebSearch(inputText))
         )
+        
+      case .performWebSearch(let query):
+        state.loadingState = .searchingWeb
+        return .run { [model = state.model] send in
+          do {
+            let searchResults = try await ollamaService.webSearch(query: query)
+            let resultsText = searchResults.results.map { result in
+              "Title: \(result.title)\nURL: \(result.url)\n\(result.content)"
+            }.joined(separator: "\n\n")
+            
+            await send(.webSearchComplete(resultsText))
+          } catch {
+            // If web search fails, continue without it
+            await send(.webSearchComplete(""))
+          }
+        }
+        
+      case .webSearchComplete(let searchResults):
+        // Get all messages and include search results in context
+        var messagesForChat = state.messages.map { message in
+          ChatMessage(role: message.role, content: message.content)
+        }.withDefaultSystemPrompt()
+        
+        // Insert web search results as a system message before the model processes
+        if !searchResults.isEmpty {
+          let searchContextMessage = ChatMessage(
+            role: .system,
+            content: "Here are recent web search results to inform your response:\n\n\(searchResults)"
+          )
+          // Insert after system prompt but before other messages
+          if !messagesForChat.isEmpty && messagesForChat[0].role == .system {
+            messagesForChat.insert(searchContextMessage, at: 1)
+          } else {
+            messagesForChat.insert(searchContextMessage, at: 0)
+          }
+        }
+        
+        return .send(.startChatStream(messagesForChat))
         
       case .startChatStream(let chatMessages):
         let temperature = userDefaultsService.getTemperature()
@@ -164,8 +205,6 @@ struct Chat {
           numPredict: maxTokens,
           stop: ["\n\n"]  // Stop at paragraph breaks to avoid cutting mid-sentence
         )
-        let webSearchEnabled = userDefaultsService.getWebSearchEnabled()
-        let tools: [Tool]? = webSearchEnabled ? [.webSearch] : nil
         
         return .run { [model = state.model] send in
           do {
@@ -173,7 +212,7 @@ struct Chat {
               model: model,
               messages: chatMessages,
               options: options,
-              tools: tools
+              tools: nil
             )
             for try await response in stream {
               if Task.isCancelled {
@@ -230,12 +269,9 @@ struct Chat {
         return .none
         
       case .streamingComplete(let reason):
-        // Only set to idle if we're not in the middle of web search
-        // If we're searching web, the tool completion will handle the next stream
-        if state.loadingState != .searchingWeb {
-          state.loadingState = .idle
-          state.messageInputState.isLoading = false
-        }
+        state.loadingState = .idle
+        state.messageInputState.isLoading = false
+        state.messageInputState.isBlocked = false
 
         state.scrollPosition = nil
         return .send(.scrollPositionChanged("bottom"))
@@ -244,6 +280,7 @@ struct Chat {
       case .streamingError(let errorMessage):
         state.loadingState = .idle
         state.messageInputState.isLoading = false
+        state.messageInputState.isBlocked = false
         state.errorMessage = errorMessage
         return .none
         
@@ -304,6 +341,7 @@ struct Chat {
       case .stopGeneration:
         state.loadingState = .idle
         state.messageInputState.isLoading = false
+        state.messageInputState.isBlocked = false
         return .cancel(id: CancelID.streaming)
         
       case .messageInput(.delegate(.stopGeneration)):

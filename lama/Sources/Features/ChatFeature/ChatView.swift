@@ -70,7 +70,7 @@ struct ChatView: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .principal) {
-        Text("PGPT")
+        Text("LLAME")
       }
       
       ToolbarItem(placement: .topBarTrailing) {

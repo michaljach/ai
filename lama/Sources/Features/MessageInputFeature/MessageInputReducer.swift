@@ -14,13 +14,15 @@ struct MessageInput {
   struct State: Equatable {
     var inputText: String = ""
     var isLoading: Bool = false
+    var isBlocked: Bool = false
     var isDisabled: Bool {
-      inputText.isEmpty || isLoading
+      inputText.isEmpty || isLoading || isBlocked
     }
     
-    init(inputText: String = "", isLoading: Bool = false) {
+    init(inputText: String = "", isLoading: Bool = false, isBlocked: Bool = false) {
       self.inputText = inputText
       self.isLoading = isLoading
+      self.isBlocked = isBlocked
     }
   }
   
@@ -29,6 +31,7 @@ struct MessageInput {
     case sendButtonTapped
     case submitButtonTapped
     case stopButtonTapped
+    case setBlocked(Bool)
     case delegate(Delegate)
     
     enum Delegate: Equatable {
@@ -64,6 +67,10 @@ struct MessageInput {
         return .run { send in
           await send(.delegate(.stopGeneration))
         }
+        
+      case .setBlocked(let isBlocked):
+        state.isBlocked = isBlocked
+        return .none
         
       case .delegate:
         return .none

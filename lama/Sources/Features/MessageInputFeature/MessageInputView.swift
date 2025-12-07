@@ -19,6 +19,7 @@ struct MessageInputView: View {
         set: { store.send(.inputTextChanged($0)) }
       ))
       .focused($isInputFocused)
+      .disabled(store.isBlocked)
       .submitLabel(.send)
       .onSubmit {
         store.send(.submitButtonTapped)
@@ -33,6 +34,7 @@ struct MessageInputView: View {
             .font(.title)
             .foregroundColor(.white)
         }
+        .disabled(store.isBlocked)
       } else {
         Button {
           store.send(.sendButtonTapped)
