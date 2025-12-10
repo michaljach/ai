@@ -18,6 +18,7 @@ struct Settings {
     var temperature: Double = 0.7
     var maxTokens: Int = 2048
     var webSearchEnabled: Bool = true
+    var availableModels: [String] = ["gemma3:4b", "llama2", "neural-chat", "mistral"]
 
     init(userDefaultsService: UserDefaultsService = .liveValue) {
       // Load from UserDefaults service

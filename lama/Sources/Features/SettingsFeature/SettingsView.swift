@@ -22,12 +22,14 @@ struct SettingsView: View {
           .autocorrectionDisabled()
           .keyboardType(.URL)
 
-        TextField("Default Model", text: Binding(
+        Picker("Default Model", selection: Binding(
           get: { store.defaultModel },
           set: { store.send(.defaultModelChanged($0)) }
-        ))
-          .textInputAutocapitalization(.never)
-          .autocorrectionDisabled()
+        )) {
+          ForEach(store.availableModels, id: \.self) { model in
+            Text(model).tag(model)
+          }
+        }
       } header: {
         Text("Connection")
       } footer: {
