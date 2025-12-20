@@ -7,10 +7,11 @@
 
 import ComposableArchitecture
 import Foundation
+import UIKit
 
 @Reducer
 struct Chat {
-  @Dependency(\.ollamaService) var ollamaService
+  @Dependency(\.groqService) var groqService
   @Dependency(\.userDefaultsService) var userDefaultsService
   
   nonisolated enum CancelID: Hashable, Sendable {
@@ -20,7 +21,6 @@ struct Chat {
   enum LoadingState: Equatable {
     case idle
     case loading
-    case searchingWeb
   }
   
   @ObservableState
@@ -68,21 +68,16 @@ struct Chat {
     case loadModels
     case modelsLoaded([String])
     case modelsLoadError(String)
-    case performWebSearch(String)
-    case webSearchComplete(String)
-    case startChatStream([ChatMessage])
+    case startChatStream([ChatMessage], enableWebSearch: Bool = true)
     case streamingResponseReceived(String)
     case streamingComplete(reason: String?)
     case streamingError(String)
-    case toolCallsReceived([ToolCall])
-    case executeToolCalls([ToolCall])
-    case toolCallCompleted(String, String) // toolName, result
     case stopGeneration
     case scrollPositionChanged(String?)
   }
   
   var body: some Reducer<State, Action> {
-    Reduce { state, action in
+    Reduce { (state: inout State, action: Action) -> Effect<Action> in
       switch action {
       case .onAppear:
         return .send(.loadModels)
@@ -98,9 +93,8 @@ struct Chat {
         state.isLoadingModels = true
         return .run { send in
           do {
-            let response = try await ollamaService.listModels()
-            let modelNames = response.models.map { $0.name }
-            await send(.modelsLoaded(modelNames))
+            let models = try await groqService.listModels()
+            await send(.modelsLoaded(models))
           } catch {
             await send(.modelsLoadError(error.localizedDescription))
           }
@@ -126,129 +120,116 @@ struct Chat {
         
       case .messageInput(.delegate(.sendMessage)):
         let inputText = state.messageInputState.inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !inputText.isEmpty else {
+        let selectedImages = state.messageInputState.selectedImages
+        let hasImages = !selectedImages.isEmpty
+        
+        guard !inputText.isEmpty || hasImages else {
           return .none
         }
         
         // Clear input and show loading
         state.messageInputState.inputText = ""
+        state.messageInputState.selectedImages = []
+        state.messageInputState.isLoading = true
         state.errorMessage = nil
         state.loadingState = .loading
-        state.messageInputState.isLoading = true
-        state.messageInputState.isBlocked = true
         
-        // Add user message
+        // Add user message with images
         let userMessageId = UUID()
         let userMessage = Message.State(
           id: userMessageId,
           role: .user,
-          content: inputText
+          content: inputText,
+          images: selectedImages
         )
         state.messages.append(userMessage)
 
-        // Convert existing messages (including the user message we just added) to ChatMessage format for Ollama
-        let chatMessages = state.messages.map { message in
-          ChatMessage(role: message.role, content: message.content)
-        }.withDefaultSystemPrompt()
+        // Build messages for API - construct special multimodal format only for current user message with images
+        var chatMessages: [ChatMessage] = []
+        
+        for message in state.messages {
+          if message.id == userMessageId && hasImages && !selectedImages.isEmpty {
+            // Build multimodal content block array for this user message
+            var contentBlocks: [ContentBlock] = []
+            
+            // Add text block if there's text
+            if !inputText.isEmpty {
+              contentBlocks.append(ContentBlock(type: "text", text: inputText))
+            }
+            
+            // Add image blocks in proper OpenAI format
+            for image in selectedImages {
+              // Resize and compress image to reduce request size
+              let resizedImage = image.resized(to: CGSize(width: 1024, height: 1024))
+              if let imageData = resizedImage.jpegData(compressionQuality: 0.6) {
+                let base64String = imageData.base64EncodedString()
+                let dataUrl = "data:image/jpeg;base64,\(base64String)"
+                contentBlocks.append(ContentBlock(type: "image_url", imageUrl: dataUrl))
+              }
+            }
+            
+            chatMessages.append(ChatMessage(role: message.role, content: .array(contentBlocks)))
+          } else {
+            // All other messages (including previous turns) must be text-only
+            chatMessages.append(ChatMessage(role: message.role, content: .text(message.content)))
+          }
+        }
+        
+        chatMessages = chatMessages.withDefaultSystemPrompt()
 
         // Force a new scroll event by clearing, then sending an update
         state.scrollPosition = nil
         
         return .merge(
           .send(.scrollPositionChanged("bottom")),
-          .send(.performWebSearch(inputText))
+          .send(.startChatStream(chatMessages))
         )
         
-      case .performWebSearch(let query):
-        state.loadingState = .searchingWeb
-        return .run { [model = state.model] send in
-          do {
-            let searchResults = try await ollamaService.webSearch(query: query)
-            let resultsText = searchResults.results.map { result in
-              "Title: \(result.title)\nURL: \(result.url)\n\(result.content)"
-            }.joined(separator: "\n\n")
-            
-            await send(.webSearchComplete(resultsText))
-          } catch {
-            // If web search fails, continue without it
-            await send(.webSearchComplete(""))
-          }
-        }
-        
-      case .webSearchComplete(let searchResults):
-        // Get all messages and include search results in context
-        var messagesForChat = state.messages.map { message in
-          ChatMessage(role: message.role, content: message.content)
-        }.withDefaultSystemPrompt()
-        
-        // Insert web search results as a system message before the model processes
-        if !searchResults.isEmpty {
-          let searchContextMessage = ChatMessage(
-            role: .system,
-            content: "Here are recent web search results to inform your response:\n\n\(searchResults)"
-          )
-          // Insert after system prompt but before other messages
-          if !messagesForChat.isEmpty && messagesForChat[0].role == .system {
-            messagesForChat.insert(searchContextMessage, at: 1)
-          } else {
-            messagesForChat.insert(searchContextMessage, at: 0)
-          }
-        }
-        
-        return .send(.startChatStream(messagesForChat))
-        
-      case .startChatStream(let chatMessages):
+      case .startChatStream(let chatMessages, let enableWebSearch):
         let temperature = userDefaultsService.getTemperature()
         let maxTokens = userDefaultsService.getMaxTokens()
-        let options = ChatOptions(
-          temperature: temperature,
-          numPredict: maxTokens,
-          stop: []  // Don't stop early - let the model complete naturally up to max tokens
-        )
         
         return .run { [model = state.model] send in
           do {
-            let stream = try await ollamaService.chat(
+            let stream = try await groqService.chat(
               model: model,
               messages: chatMessages,
-              options: options,
-              tools: nil
+              temperature: temperature,
+              maxTokens: maxTokens,
+              topP: nil,
+              enableWebSearch: enableWebSearch
             )
+            
             for try await response in stream {
               if Task.isCancelled {
                 await send(.streamingComplete(reason: nil))
                 break
               }
               
-              // Check for tool calls
-              if let toolCalls = response.message?.toolCalls, !toolCalls.isEmpty {
-                await send(.toolCallsReceived(toolCalls))
+              // Extract content from the response
+              if let message = response.message {
+                var contentText = ""
+                if case .text(let text) = message.content {
+                  contentText = text
+                }
+                if !contentText.isEmpty {
+                  await send(.streamingResponseReceived(contentText))
+                }
               }
               
-              if let messageContent = response.message?.content, !messageContent.isEmpty {
-                await send(.streamingResponseReceived(messageContent))
-              }
-              if response.done == true {
+              if response.done ?? false {
                 await send(.streamingComplete(reason: response.doneReason))
-                break
               }
             }
           } catch {
-            if !Task.isCancelled {
-              await send(.streamingError(error.localizedDescription))
-            } else {
-              await send(.streamingComplete(reason: nil))
-            }
+            await send(.streamingError(error.localizedDescription))
           }
         }
-        .cancellable(id: CancelID.streaming)
+        .cancellable(id: CancelID.streaming, cancelInFlight: true)
         
       case .streamingResponseReceived(let content):
-        // Only process if we have actual content
-        guard !content.isEmpty else {
-          return .none
-        }
-
+        state.errorMessage = nil
+        
         // Create assistant message if it doesn't exist, otherwise append to it
         if let lastIndex = state.messages.indices.last,
            state.messages[lastIndex].role == .assistant {
@@ -264,90 +245,31 @@ struct Chat {
           state.messages.append(assistantMessage)
         }
 
-        // Keep loading state active during streaming - only hide on completion
-
         return .none
         
       case .streamingComplete(let reason):
         state.loadingState = .idle
         state.messageInputState.isLoading = false
-        state.messageInputState.isBlocked = false
 
         state.scrollPosition = nil
         return .send(.scrollPositionChanged("bottom"))
         
-        
       case .streamingError(let errorMessage):
         state.loadingState = .idle
         state.messageInputState.isLoading = false
-        state.messageInputState.isBlocked = false
         state.errorMessage = errorMessage
         return .none
-        
-      case .toolCallsReceived(let toolCalls):
-        // Switch to web searching state
-        state.loadingState = .searchingWeb
-        return .send(.executeToolCalls(toolCalls))
-        
-      case .executeToolCalls(let toolCalls):
-        return .run { [model = state.model] send in
-          for toolCall in toolCalls {
-            if toolCall.function.name == "web_search" {
-              do {
-                // Parse the arguments - handle both string and object formats
-                let argumentsData = toolCall.function.arguments.data(using: .utf8) ?? Data()
-                
-                guard let arguments = try? JSONSerialization.jsonObject(with: argumentsData) as? [String: Any],
-                      let query = arguments["query"] as? String else {
-                  await send(.streamingError("Invalid web search query format"))
-                  continue
-                }
-                
-                let searchResults = try await ollamaService.webSearch(query: query)
-                
-                // Format the results as a string
-                let resultsText = searchResults.results.map { result in
-                  "Title: \(result.title)\nURL: \(result.url)\n\(result.content)"
-                }.joined(separator: "\n\n")
-                
-                await send(.toolCallCompleted("web_search", resultsText))
-              } catch {
-                // Turn off web search indicator and show error
-                await send(.streamingError("Web search failed: \(error.localizedDescription)"))
-              }
-            }
-          }
-        }
-        
-      case .toolCallCompleted(let toolName, let result):
-        // Back to regular loading - content will arrive next
-        state.loadingState = .loading
-
-        // Add the tool result as a tool message (hidden in UI)
-        let toolMessage = Message.State(
-          id: UUID(),
-          role: .tool,
-          content: "Search results:\n\n\(result)"
-        )
-        state.messages.append(toolMessage)
-
-        // Convert messages including the tool result for the API call
-        let chatMessages = state.messages.map { message in
-          ChatMessage(role: message.role, content: message.content)
-        }.withDefaultSystemPrompt()
-        
-        return .send(.startChatStream(chatMessages))
         
       case .stopGeneration:
         state.loadingState = .idle
         state.messageInputState.isLoading = false
-        state.messageInputState.isBlocked = false
         return .cancel(id: CancelID.streaming)
         
       case .messageInput(.delegate(.stopGeneration)):
         return .send(.stopGeneration)
         
       case .messageInput:
+        // Forward all other messageInput actions to the child reducer
         return .none
         
       case .messages:
@@ -358,12 +280,33 @@ struct Chat {
         return .none
       }
     }
-    .forEach(\.messages, action: \.messages) {
-      Message()
-    }
-    
     Scope(state: \.messageInputState, action: \.messageInput) {
       MessageInput()
     }
+  }
+}
+
+// MARK: - UIImage Extension
+
+extension UIImage {
+  /// Resize image to fit within the specified size while maintaining aspect ratio
+  func resized(to size: CGSize) -> UIImage {
+    let aspectRatio = self.size.width / self.size.height
+    let targetSize: CGSize
+    
+    if aspectRatio > 1 {
+      // Landscape or square
+      targetSize = CGSize(width: size.width, height: size.width / aspectRatio)
+    } else {
+      // Portrait
+      targetSize = CGSize(width: size.height * aspectRatio, height: size.height)
+    }
+    
+    let renderer = UIGraphicsImageRenderer(size: targetSize)
+    let resizedImage = renderer.image { _ in
+      self.draw(in: CGRect(origin: .zero, size: targetSize))
+    }
+    
+    return resizedImage
   }
 }

@@ -7,6 +7,7 @@
 
 import ComposableArchitecture
 import Foundation
+import UIKit
 
 @Reducer
 struct Message {
@@ -15,11 +16,13 @@ struct Message {
     var id: UUID
     var role: MessageRole
     var content: String
+    var images: [UIImage] = []
     
-    init(id: UUID = UUID(), role: MessageRole, content: String) {
+    init(id: UUID = UUID(), role: MessageRole, content: String, images: [UIImage] = []) {
       self.id = id
       self.role = role
       self.content = content
+      self.images = images
     }
   }
   

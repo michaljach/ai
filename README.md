@@ -44,6 +44,25 @@ The Swift Package Manager dependencies will be automatically resolved when you b
 
 ## Setup
 
+### API Key Configuration
+
+To keep your Groq API key secure and prevent it from being committed to the repository:
+
+1. **Edit the config file:**
+
+   - Open `lama/config.json` in Xcode
+   - Replace `YOUR_GROQ_API_KEY_HERE` with your actual Groq API key:
+
+   ```json
+   {
+     "groqApiKey": "gsk_your_actual_api_key_here"
+   }
+   ```
+
+2. **Build and run the app** - the API key will be read from `config.json` automatically
+
+**Note:** `lama/config.json` is already in `.gitignore` and will never be committed to the repository.
+
 ### Using Ollama Cloud or Local Server
 
 The app works with both Ollama's cloud service and local installations:

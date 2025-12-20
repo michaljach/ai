@@ -13,8 +13,8 @@ struct Settings {
   @Dependency(\.userDefaultsService) var userDefaultsService
   @ObservableState
   struct State: Equatable {
-    var ollamaEndpoint: String = ""
-    var defaultModel: String = "gpt-oss:120b"
+    var groqAPIKey: String = ""
+    var defaultModel: String = "openai/gpt-oss:120b"
     var temperature: Double = 0.7
     var maxTokens: Int = 2048
     var webSearchEnabled: Bool = true
@@ -23,20 +23,20 @@ struct Settings {
 
     init(userDefaultsService: UserDefaultsService = .liveValue) {
       // Load from UserDefaults service
-      self.ollamaEndpoint = userDefaultsService.getOllamaEndpoint()
+      self.groqAPIKey = userDefaultsService.getGroqAPIKey() ?? ""
       self.defaultModel = userDefaultsService.getDefaultModel()
       self.temperature = userDefaultsService.getTemperature()
       self.maxTokens = userDefaultsService.getMaxTokens()
-      self.webSearchEnabled = userDefaultsService.getWebSearchEnabled()
+      self.webSearchEnabled = userDefaultsService.isWebSearchEnabled()
     }
   }
 
   enum Action {
-    case ollamaEndpointChanged(String)
+    case groqAPIKeyChanged(String)
     case defaultModelChanged(String)
     case temperatureChanged(Double)
-    case maxTokensChanged(Int)
     case webSearchEnabledChanged(Bool)
+    case maxTokensChanged(Int)
     case resetToDefaults
     case loadModels
     case modelsLoaded([String])
@@ -46,9 +46,9 @@ struct Settings {
   var body: some Reducer<State, Action> {
     Reduce { state, action in
       switch action {
-      case .ollamaEndpointChanged(let value):
-        state.ollamaEndpoint = value
-        userDefaultsService.setOllamaEndpoint(value)
+      case .groqAPIKeyChanged(let value):
+        state.groqAPIKey = value
+        userDefaultsService.setGroqAPIKey(value)
         return .none
 
       case .defaultModelChanged(let value):
@@ -65,7 +65,7 @@ struct Settings {
         state.maxTokens = value
         userDefaultsService.setMaxTokens(value)
         return .none
-
+      
       case .webSearchEnabledChanged(let value):
         state.webSearchEnabled = value
         userDefaultsService.setWebSearchEnabled(value)
@@ -73,21 +73,20 @@ struct Settings {
 
       case .resetToDefaults:
         userDefaultsService.resetToDefaults()
-        state.ollamaEndpoint = userDefaultsService.getOllamaEndpoint()
+        state.groqAPIKey = userDefaultsService.getGroqAPIKey() ?? ""
         state.defaultModel = userDefaultsService.getDefaultModel()
         state.temperature = userDefaultsService.getTemperature()
         state.maxTokens = userDefaultsService.getMaxTokens()
-        state.webSearchEnabled = userDefaultsService.getWebSearchEnabled()
+        state.webSearchEnabled = userDefaultsService.isWebSearchEnabled()
         return .none
       
       case .loadModels:
         state.isLoadingModels = true
-        return .run { [userDefaultsService] send in
-          let ollamaService = OllamaService(userDefaultsService: userDefaultsService)
+        return .run { send in
+          let groqService = GroqService()
           do {
-            let response = try await ollamaService.listModels()
-            let modelNames = response.models.map { $0.name }
-            await send(.modelsLoaded(modelNames))
+            let models = try await groqService.listModels()
+            await send(.modelsLoaded(models))
           } catch {
             await send(.modelsLoadFailed)
           }

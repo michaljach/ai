@@ -40,10 +40,9 @@ struct ChatList {
           await send(.newChatButtonTapped)
         }
         
-      case let .path(.element(id: id, action: .chat)):
-        // CRITICAL: Sync all changes from path to chats collection
-        // This must happen on every chat action to preserve message history
-        for (index, pathElement) in state.path.enumerated() {
+      case .path(.element(id: _, action: _)):
+        // Sync all changes from path to chats collection
+        for pathElement in state.path {
           if case let .chat(pathChat) = pathElement {
             // Update the chats collection with the current path chat state
             if state.chats.contains(where: { $0.id == pathChat.id }) {
@@ -67,12 +66,9 @@ struct ChatList {
         return .none
 
       case .removeEmptyChats:
-        // Remove chats with no visible messages (excluding tool messages)
+        // Remove chats with no visible messages
         state.chats.removeAll { chat in
-          let visibleMessages = chat.messages.filter { message in
-            message.role != .tool
-          }
-          return visibleMessages.isEmpty
+          chat.messages.isEmpty
         }
         return .none
 

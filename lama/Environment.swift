@@ -8,12 +8,12 @@
 import ComposableArchitecture
 
 extension DependencyValues {
-  var ollamaService: OllamaService {
-    get { self[OllamaServiceKey.self] }
-    set { self[OllamaServiceKey.self] = newValue }
+  var groqService: GroqService {
+    get { self[GroqServiceKey.self] }
+    set { self[GroqServiceKey.self] = newValue }
   }
 }
 
-private struct OllamaServiceKey: DependencyKey {
-  static let liveValue = OllamaService(userDefaultsService: .liveValue)
+private struct GroqServiceKey: DependencyKey {
+  static let liveValue = GroqService(userDefaultsService: .liveValue)
 }

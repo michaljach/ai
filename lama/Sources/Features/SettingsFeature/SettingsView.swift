@@ -14,13 +14,12 @@ struct SettingsView: View {
   var body: some View {
     Form {
       Section {
-        TextField("Ollama Endpoint", text: Binding(
-          get: { store.ollamaEndpoint },
-          set: { store.send(.ollamaEndpointChanged($0)) }
+        SecureField("Groq API Key", text: Binding(
+          get: { store.groqAPIKey },
+          set: { store.send(.groqAPIKeyChanged($0)) }
         ))
           .textInputAutocapitalization(.never)
           .autocorrectionDisabled()
-          .keyboardType(.URL)
 
         if store.isLoadingModels {
           HStack {
@@ -48,9 +47,9 @@ struct SettingsView: View {
           }
         }
       } header: {
-        Text("Connection")
+        Text("Groq API")
       } footer: {
-        Text("Enter the URL of your Ollama server (e.g., http://192.168.1.100:11434)")
+        Text("Get your API key from https://console.groq.com/keys")
       }
 
       Section {
@@ -81,23 +80,16 @@ struct SettingsView: View {
       } footer: {
         Text("Temperature controls randomness (0 = deterministic, 2 = very creative). Max tokens limits response length.")
       }
-
+      
       Section {
-        Toggle(isOn: Binding(
+        Toggle("Enable Web Search", isOn: Binding(
           get: { store.webSearchEnabled },
           set: { store.send(.webSearchEnabledChanged($0)) }
-        )) {
-          VStack(alignment: .leading, spacing: 4) {
-            Text("Web Search")
-            Text("Allow the model to search the web for current information")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-          }
-        }
+        ))
       } header: {
-        Text("Features")
+        Text("Web Search")
       } footer: {
-        Text("When enabled, the model can search the internet to provide up-to-date information. Requires an Ollama API key.")
+        Text("Allow the AI to search the web for current information when answering questions.")
       }
 
       Section {

@@ -18,14 +18,12 @@ struct ChatListView: View {
           NoChatsMessage()
         } else {
           List {
-            ForEach(store.chats) { chat in
+            ForEach(store.chats, id: \.id) { chat in
               NavigationLink(state: ChatList.Path.State.chat(chat)) {
                 VStack(alignment: .leading, spacing: 4) {
                   Text(chat.title)
                     .font(.headline)
-                  let visibleMessageCount = chat.messages.filter { message in
-                    message.role != .tool
-                  }.count
+                  let visibleMessageCount = chat.messages.count
                   if visibleMessageCount > 0 {
                     Text("\(visibleMessageCount) message\(visibleMessageCount == 1 ? "" : "s")")
                       .font(.caption)
@@ -37,7 +35,7 @@ struct ChatListView: View {
             }
             .onDelete { indexSet in
               for index in indexSet {
-                let chat = store.chats[index]
+                let chat = store.chats[store.chats.index(store.chats.startIndex, offsetBy: index)]
                 store.send(.deleteChat(chat.id))
               }
             }

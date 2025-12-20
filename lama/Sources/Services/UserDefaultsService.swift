@@ -12,7 +12,7 @@ import ComposableArchitecture
 struct UserDefaultsService {
   // Keys
   private enum Keys {
-    static let ollamaEndpoint = "ollamaEndpoint"
+    static let groqAPIKey = "groqAPIKey"
     static let defaultModel = "defaultModel"
     static let temperature = "temperature"
     static let maxTokens = "maxTokens"
@@ -21,16 +21,15 @@ struct UserDefaultsService {
 
   // Default values
   private enum Defaults {
-    static let ollamaEndpoint = "https://ollama.com"
-    static let defaultModel = "gpt-oss:120b"
-    static let temperature = 0.7
-    static let maxTokens = 640
-    static let authToken = ""
-    static let webSearchEnabled = true
+    nonisolated static let groqAPIKey: String? = ConfigManager.groqAPIKey
+    nonisolated static let defaultModel = "mixtral-8x7b-32768"
+    nonisolated static let temperature = 0.7
+    nonisolated static let maxTokens = 640
+    nonisolated static let webSearchEnabled = true
   }
   
-  var getOllamaEndpoint: @Sendable () -> String
-  var setOllamaEndpoint: @Sendable (String) -> Void
+  var getGroqAPIKey: @Sendable () -> String?
+  var setGroqAPIKey: @Sendable (String) -> Void
   
   var getDefaultModel: @Sendable () -> String
   var setDefaultModel: @Sendable (String) -> Void
@@ -41,9 +40,7 @@ struct UserDefaultsService {
   var getMaxTokens: @Sendable () -> Int
   var setMaxTokens: @Sendable (Int) -> Void
   
-  var getAuthToken: @Sendable () -> String?
-
-  var getWebSearchEnabled: @Sendable () -> Bool
+  var isWebSearchEnabled: @Sendable () -> Bool
   var setWebSearchEnabled: @Sendable (Bool) -> Void
 
   var resetToDefaults: @Sendable () -> Void
@@ -51,11 +48,11 @@ struct UserDefaultsService {
 
 extension UserDefaultsService: DependencyKey {
   static let liveValue = UserDefaultsService(
-    getOllamaEndpoint: {
-      UserDefaults.standard.string(forKey: Keys.ollamaEndpoint) ?? Defaults.ollamaEndpoint
+    getGroqAPIKey: {
+      UserDefaults.standard.string(forKey: Keys.groqAPIKey) ?? Defaults.groqAPIKey
     },
-    setOllamaEndpoint: { value in
-      UserDefaults.standard.set(value, forKey: Keys.ollamaEndpoint)
+    setGroqAPIKey: { value in
+      UserDefaults.standard.set(value, forKey: Keys.groqAPIKey)
     },
     getDefaultModel: {
       UserDefaults.standard.string(forKey: Keys.defaultModel) ?? Defaults.defaultModel
@@ -77,35 +74,32 @@ extension UserDefaultsService: DependencyKey {
     setMaxTokens: { value in
       UserDefaults.standard.set(value, forKey: Keys.maxTokens)
     },
-    getAuthToken: {
-      Defaults.authToken
-    },
-    getWebSearchEnabled: {
-      UserDefaults.standard.object(forKey: Keys.webSearchEnabled) as? Bool ?? Defaults.webSearchEnabled
+    isWebSearchEnabled: {
+      let value = UserDefaults.standard.object(forKey: Keys.webSearchEnabled)
+      return value == nil ? Defaults.webSearchEnabled : UserDefaults.standard.bool(forKey: Keys.webSearchEnabled)
     },
     setWebSearchEnabled: { value in
       UserDefaults.standard.set(value, forKey: Keys.webSearchEnabled)
     },
     resetToDefaults: {
-      UserDefaults.standard.set(Defaults.ollamaEndpoint, forKey: Keys.ollamaEndpoint)
+      UserDefaults.standard.set(Defaults.groqAPIKey, forKey: Keys.groqAPIKey)
       UserDefaults.standard.set(Defaults.defaultModel, forKey: Keys.defaultModel)
       UserDefaults.standard.set(Defaults.temperature, forKey: Keys.temperature)
       UserDefaults.standard.set(Defaults.maxTokens, forKey: Keys.maxTokens)
       UserDefaults.standard.set(Defaults.webSearchEnabled, forKey: Keys.webSearchEnabled)
     }
   )
-  
+
   static let testValue = UserDefaultsService(
-    getOllamaEndpoint: { Defaults.ollamaEndpoint },
-    setOllamaEndpoint: { _ in },
+    getGroqAPIKey: { Defaults.groqAPIKey },
+    setGroqAPIKey: { _ in },
     getDefaultModel: { Defaults.defaultModel },
     setDefaultModel: { _ in },
     getTemperature: { Defaults.temperature },
     setTemperature: { _ in },
     getMaxTokens: { Defaults.maxTokens },
     setMaxTokens: { _ in },
-    getAuthToken: { Defaults.authToken },
-    getWebSearchEnabled: { Defaults.webSearchEnabled },
+    isWebSearchEnabled: { Defaults.webSearchEnabled },
     setWebSearchEnabled: { _ in },
     resetToDefaults: { }
   )

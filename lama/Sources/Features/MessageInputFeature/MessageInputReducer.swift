@@ -7,6 +7,7 @@
 
 import ComposableArchitecture
 import Foundation
+import UIKit
 
 @Reducer
 struct MessageInput {
@@ -14,15 +15,14 @@ struct MessageInput {
   struct State: Equatable {
     var inputText: String = ""
     var isLoading: Bool = false
-    var isBlocked: Bool = false
-    var isDisabled: Bool {
-      inputText.isEmpty || isLoading || isBlocked
-    }
+    var selectedImages: [UIImage] = []
+    var showImagePicker: Bool = false
     
-    init(inputText: String = "", isLoading: Bool = false, isBlocked: Bool = false) {
+    init(inputText: String = "", isLoading: Bool = false, selectedImages: [UIImage] = [], showImagePicker: Bool = false) {
       self.inputText = inputText
       self.isLoading = isLoading
-      self.isBlocked = isBlocked
+      self.selectedImages = selectedImages
+      self.showImagePicker = showImagePicker
     }
   }
   
@@ -31,12 +31,37 @@ struct MessageInput {
     case sendButtonTapped
     case submitButtonTapped
     case stopButtonTapped
-    case setBlocked(Bool)
+    case imagePickerTapped
+    case imagesSelected([UIImage])
+    case removeImage(Int)
     case delegate(Delegate)
     
     enum Delegate: Equatable {
       case sendMessage
       case stopGeneration
+    }
+    
+    static func == (lhs: Action, rhs: Action) -> Bool {
+      switch (lhs, rhs) {
+      case (.inputTextChanged(let a), .inputTextChanged(let b)):
+        return a == b
+      case (.imagePickerTapped, .imagePickerTapped):
+        return true
+      case (.sendButtonTapped, .sendButtonTapped):
+        return true
+      case (.submitButtonTapped, .submitButtonTapped):
+        return true
+      case (.stopButtonTapped, .stopButtonTapped):
+        return true
+      case (.imagesSelected, .imagesSelected):
+        return true  // UIImage doesn't conform to Equatable, so we can't compare
+      case (.removeImage(let a), .removeImage(let b)):
+        return a == b
+      case (.delegate(let a), .delegate(let b)):
+        return a == b
+      default:
+        return false
+      }
     }
   }
   
@@ -48,28 +73,33 @@ struct MessageInput {
         return .none
         
       case .sendButtonTapped:
-        guard !state.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard !state.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !state.selectedImages.isEmpty else {
           return .none
         }
-        return .run { send in
-          await send(.delegate(.sendMessage))
-        }
+        return .send(.delegate(.sendMessage))
         
       case .submitButtonTapped:
-        guard !state.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard !state.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !state.selectedImages.isEmpty else {
           return .none
         }
-        return .run { send in
-          await send(.delegate(.sendMessage))
-        }
+        return .send(.delegate(.sendMessage))
         
       case .stopButtonTapped:
-        return .run { send in
-          await send(.delegate(.stopGeneration))
-        }
+        return .send(.delegate(.stopGeneration))
         
-      case .setBlocked(let isBlocked):
-        state.isBlocked = isBlocked
+      case .imagePickerTapped:
+        state.showImagePicker = true
+        return .none
+        
+      case .imagesSelected(let images):
+        state.selectedImages.append(contentsOf: images)
+        state.showImagePicker = false
+        return .none
+        
+      case .removeImage(let index):
+        if index < state.selectedImages.count {
+          state.selectedImages.remove(at: index)
+        }
         return .none
         
       case .delegate:
