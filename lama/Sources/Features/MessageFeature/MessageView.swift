@@ -42,13 +42,23 @@ struct MessageView: View {
                 .background(Color.colorGray)
                 .clipShape(RoundedRectangle(cornerRadius: 24))
                 .textSelection(.enabled)
+                .multilineTextAlignment(.leading)
             }
           }
         }
       } else {
-        Markdown(store.content)
-          .textSelection(.enabled)
-          .markdownTableBorderStyle(.init(color: .colorGray))
+        VStack(alignment: .leading, spacing: 8) {
+          // Display reasoning if present
+          if let reasoning = store.reasoning {
+            ReasoningView(reasoning: reasoning)
+          }
+          
+          // Display assistant message content
+          Markdown(store.content)
+            .multilineTextAlignment(.leading)
+            .textSelection(.enabled)
+            .markdownTableBorderStyle(.init(color: .colorGray))
+        }
       }
     }
     .padding()
@@ -60,7 +70,7 @@ struct MessageView: View {
     MessageView(
       store: Store(initialState: Message.State(
         role: .user,
-        content: "Hello, how are you?"
+        content: "Hello, how are you?",
       )) {
         Message()
       }
@@ -70,6 +80,16 @@ struct MessageView: View {
       store: Store(initialState: Message.State(
         role: .assistant,
         content: "I'm doing well, thank you! How can I help you today? What is up?"
+      )) {
+        Message()
+      }
+    )
+    
+    MessageView(
+      store: Store(initialState: Message.State(
+        role: .assistant,
+        content: "The user is asking about the reasoning process. I should explain my thought process and how I approach problem-solving.",
+        reasoning: "The user wants to understand my reasoning. I need to provide a clear explanation of how I think through problems and make decisions. I should be transparent about my thought process."
       )) {
         Message()
       }

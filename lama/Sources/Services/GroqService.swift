@@ -226,10 +226,6 @@ actor GroqService {
     
     do {
       urlRequest.httpBody = try JSONEncoder().encode(request)
-      // Debug: Print the request body
-      if let body = urlRequest.httpBody, let jsonString = String(data: body, encoding: .utf8) {
-        print("DEBUG: Streaming Request body:\n\(jsonString)")
-      }
     } catch {
       throw GroqError.encodingError(error)
     }
@@ -248,9 +244,6 @@ actor GroqService {
             var errorData = Data()
             for try await byte in bytes {
               errorData.append(byte)
-            }
-            if let errorString = String(data: errorData, encoding: .utf8) {
-              print("DEBUG: API Error Response:\n\(errorString)")
             }
             if let errorResponse = try? JSONDecoder().decode(GroqErrorResponse.self, from: errorData) {
               continuation.finish(throwing: GroqError.apiError(errorResponse.error?.message ?? "Unknown error"))
@@ -284,6 +277,7 @@ actor GroqService {
                     
                     if let jsonData = jsonString.data(using: .utf8) {
                       do {
+                        
                         let groqResponse = try JSONDecoder().decode(GroqChatResponse.self, from: jsonData)
                         let chatResponse = convertGroqResponseToChatResponse(groqResponse)
                         continuation.yield(chatResponse)
@@ -316,6 +310,13 @@ actor GroqService {
     // Extract tool calls from either message or delta
     let toolCalls = choice?.message?.tool_calls ?? choice?.delta?.tool_calls
     
+    // Extract web search sources from executed_tools (Groq Compound models)
+    let executedTools = choice?.message?.executed_tools ?? choice?.delta?.executed_tools
+    let sources = extractWebSearchSources(from: executedTools)
+    
+    // Extract reasoning if available
+    let reasoning = choice?.message?.reasoning
+    
     // Convert string content to MessageContent (keep it simple for streaming)
     let message = ChatMessage(role: .assistant, content: messageContentStr, toolCalls: toolCalls)
     
@@ -330,8 +331,33 @@ actor GroqService {
       promptEvalCount: groqResponse.usage?.promptTokens.map { Int32($0) },
       promptEvalDuration: nil,
       evalCount: groqResponse.usage?.completionTokens.map { Int32($0) },
-      evalDuration: nil
+      evalDuration: nil,
+      sources: sources,
+      reasoning: reasoning
     )
+  }
+  
+  private func extractWebSearchSources(from executedTools: [ExecutedTool]?) -> [WebSearchSource]? {
+    guard let executedTools = executedTools else { return nil }
+    
+    var sources: [WebSearchSource] = []
+    
+    for tool in executedTools {
+      guard let searchResultsContainer = tool.search_results,
+            let searchResults = searchResultsContainer.results else { continue }
+      
+      for result in searchResults {
+        let title = result.title ?? "Untitled"
+        let url = result.url ?? ""
+        let content = result.content ?? ""
+        
+        if !title.isEmpty && !url.isEmpty {
+          sources.append(WebSearchSource(title: title, url: url, content: content))
+        }
+      }
+    }
+    
+    return sources.isEmpty ? nil : sources
   }
   
   // MARK: - Web Search

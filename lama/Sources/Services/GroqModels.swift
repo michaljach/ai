@@ -263,6 +263,8 @@ struct ChatResponse: Codable {
   let promptEvalDuration: Int64?
   let evalCount: Int32?
   let evalDuration: Int64?
+  let sources: [WebSearchSource]?
+  let reasoning: String?
 
   enum CodingKeys: String, CodingKey {
     case model
@@ -276,6 +278,8 @@ struct ChatResponse: Codable {
     case promptEvalDuration = "prompt_eval_duration"
     case evalCount = "eval_count"
     case evalDuration = "eval_duration"
+    case sources
+    case reasoning
   }
 }
 
@@ -305,12 +309,15 @@ struct GroqMessage: Codable {
   let role: String
   let content: String?
   let tool_calls: [GroqToolCall]?
+  let executed_tools: [ExecutedTool]?
+  let reasoning: String?
 }
 
 struct GroqDelta: Codable {
   let role: String?
   let content: String?
   let tool_calls: [GroqToolCall]?
+  let executed_tools: [ExecutedTool]?
 }
 
 struct GroqToolCall: Codable {
@@ -322,6 +329,31 @@ struct GroqToolCall: Codable {
 struct GroqToolCallFunction: Codable {
   let name: String
   let arguments: String
+}
+
+// MARK: - Executed Tools (for web search results)
+
+struct ExecutedTool: Codable {
+  let type: String?
+  let search_results: SearchResultsContainer?
+}
+
+struct SearchResultsContainer: Codable {
+  let results: [SearchResult]?
+}
+
+struct SearchResult: Codable {
+  let title: String?
+  let url: String?
+  let content: String?
+  let relevance_score: Double?
+  
+  enum CodingKeys: String, CodingKey {
+    case title
+    case url
+    case content
+    case relevance_score
+  }
 }
 
 struct GroqUsage: Codable {
@@ -351,6 +383,20 @@ struct GroqModel: Codable {
 }
 
 // MARK: - Web Search
+
+struct WebSearchSource: Codable, Identifiable, Equatable {
+  let id: String
+  let title: String
+  let url: String
+  let content: String
+  
+  init(id: String = UUID().uuidString, title: String, url: String, content: String) {
+    self.id = id
+    self.title = title
+    self.url = url
+    self.content = content
+  }
+}
 
 struct WebSearchResponse: Codable {
   let results: [WebSearchResult]

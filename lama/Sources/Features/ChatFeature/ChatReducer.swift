@@ -21,6 +21,7 @@ struct Chat {
   enum LoadingState: Equatable {
     case idle
     case loading
+    case searchingWeb
   }
   
   @ObservableState
@@ -37,6 +38,9 @@ struct Chat {
     }
     var messageInputState = MessageInput.State()
     var scrollPosition: String?
+    var webSearchSources: [WebSearchSource] = []
+    var isShowingWebSearchUI: Bool = false
+    var pendingReasoning: String?
     
     init(id: UUID, userDefaultsService: UserDefaultsService = .liveValue) {
       self.id = id
@@ -74,6 +78,10 @@ struct Chat {
     case streamingError(String)
     case stopGeneration
     case scrollPositionChanged(String?)
+    case webSearchStarted
+    case webSearchCompleted([WebSearchSource])
+    case clearWebSearchUI
+    case reasoningReceived(String)
   }
   
   var body: some Reducer<State, Action> {
@@ -191,6 +199,11 @@ struct Chat {
         
         return .run { [model = state.model] send in
           do {
+            // Send web search started action if enabled
+            if enableWebSearch {
+              await send(.webSearchStarted)
+            }
+            
             let stream = try await groqService.chat(
               model: model,
               messages: chatMessages,
@@ -204,6 +217,16 @@ struct Chat {
               if Task.isCancelled {
                 await send(.streamingComplete(reason: nil))
                 break
+              }
+              
+              // Extract reasoning if available
+              if let reasoning = response.reasoning {
+                await send(.reasoningReceived(reasoning))
+              }
+              
+              // Extract sources from the response if available
+              if let sources = response.sources, !sources.isEmpty {
+                await send(.webSearchCompleted(sources))
               }
               
               // Extract content from the response
@@ -236,13 +259,15 @@ struct Chat {
           // Append to existing assistant message
           state.messages[lastIndex].content += content
         } else {
-          // Create new assistant message with this content
+          // Create new assistant message with pending reasoning if available
           let assistantMessage = Message.State(
             id: UUID(),
             role: .assistant,
-            content: content
+            content: content,
+            reasoning: state.pendingReasoning
           )
           state.messages.append(assistantMessage)
+          state.pendingReasoning = nil
         }
 
         return .none
@@ -277,6 +302,32 @@ struct Chat {
         
       case .scrollPositionChanged(let position):
         state.scrollPosition = position
+        return .none
+        
+      case .webSearchStarted:
+        state.loadingState = .searchingWeb
+        state.isShowingWebSearchUI = true
+        return .none
+        
+      case .webSearchCompleted(let sources):
+        state.webSearchSources = sources
+        state.loadingState = .loading
+        state.isShowingWebSearchUI = true
+        return .none
+        
+      case .clearWebSearchUI:
+        state.isShowingWebSearchUI = false
+        state.webSearchSources = []
+        return .none
+        
+      case .reasoningReceived(let reasoning):
+        state.pendingReasoning = reasoning
+        // Also update the last assistant message if it exists and doesn't have reasoning yet
+        if let lastIndex = state.messages.indices.last,
+           state.messages[lastIndex].role == .assistant,
+           state.messages[lastIndex].reasoning == nil {
+          state.messages[lastIndex].reasoning = reasoning
+        }
         return .none
       }
     }

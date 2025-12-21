@@ -29,6 +29,11 @@ struct ChatView: View {
                 LoadingIndicatorView(text: "Thinking...")
                   .padding()
                   .id("loading")
+              
+              case .searchingWeb:
+                LoadingIndicatorView(text: "Searching the web...")
+                  .padding()
+                  .id("searching")
                 
               case .idle:
                 EmptyView()
@@ -39,6 +44,13 @@ struct ChatView: View {
                   .font(.caption)
                   .foregroundColor(.red)
                   .padding(.horizontal)
+              }
+              
+              // Web search sources display
+              if !store.webSearchSources.isEmpty && store.isShowingWebSearchUI {
+                WebSearchSourcesView(sources: store.webSearchSources)
+                  .padding(.vertical, 8)
+                  .id("sources")
               }
 
               Color.clear
@@ -107,9 +119,23 @@ struct ChatView: View {
         ),
         Message.State(
           role: .assistant,
-          content: "Moonlit waves softly whisper secrets."
+          content: "Moonlit waves softly whisper secrets.",
+          reasoning: "The user asked me to summarize the haiku. I need to capture the essence of the original poem - the imagery of moonlit waves and secrets - in a single concise line. The key elements are: waves, moonlight, whispers, and secrets. I'll combine these naturally."
         )
       ]
+      state.webSearchSources = [
+        WebSearchSource(
+          title: "The Power of Haiku Poetry",
+          url: "https://www.poetryfoundation.org/poems/haiku",
+          content: "Haiku is a traditional form of Japanese poetry consisting of three lines with a 5-7-5 syllable pattern."
+        ),
+        WebSearchSource(
+          title: "Ocean Poetry Classics",
+          url: "https://www.literarydevices.com/ocean-poetry",
+          content: "Ocean poetry has inspired writers for centuries with its themes of mystery, power, and tranquility."
+        )
+      ]
+      state.isShowingWebSearchUI = true
       return state
     }()) {
       Chat()

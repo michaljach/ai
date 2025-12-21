@@ -12,7 +12,7 @@ struct ConfigManager {
   /// Get the Groq API key from config.json
   static var groqAPIKey: String? {
     guard let url = Bundle.main.url(forResource: "config", withExtension: "json") else {
-      print("⚠️ config.json not found in bundle")
+
       return nil
     }
     
@@ -26,7 +26,7 @@ struct ConfigManager {
         return apiKey
       }
     } catch {
-      print("⚠️ Error reading config.json: \(error)")
+      // Silently fail
     }
     
     return nil
