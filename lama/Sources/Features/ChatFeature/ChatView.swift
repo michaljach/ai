@@ -52,22 +52,11 @@ struct ChatView: View {
                   .padding(.vertical, 8)
                   .id("sources")
               }
-
-              Color.clear
-                .frame(height: 100)
-                .id("bottom")
             }
             .scrollTargetLayout()
           }
           .scrollDismissesKeyboard(.interactively)
           .defaultScrollAnchor(.bottom)
-          .onChange(of: store.scrollPosition) { _, newValue in
-            if let position = newValue {
-              withAnimation(.easeOut(duration: 0.25)) {
-                proxy.scrollTo(position, anchor: .bottom)
-              }
-            }
-          }
         }
       }
       

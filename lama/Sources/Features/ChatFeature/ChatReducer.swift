@@ -37,7 +37,6 @@ struct Chat {
       self.messages.filter({ [.assistant, .system, .user].contains($0.role) })
     }
     var messageInputState = MessageInput.State()
-    var scrollPosition: String?
     var webSearchSources: [WebSearchSource] = []
     var isShowingWebSearchUI: Bool = false
     var pendingReasoning: String?
@@ -77,7 +76,6 @@ struct Chat {
     case streamingComplete(reason: String?)
     case streamingError(String)
     case stopGeneration
-    case scrollPositionChanged(String?)
     case webSearchStarted
     case webSearchCompleted([WebSearchSource])
     case clearWebSearchUI
@@ -184,14 +182,8 @@ struct Chat {
         }
         
         chatMessages = chatMessages.withDefaultSystemPrompt()
-
-        // Force a new scroll event by clearing, then sending an update
-        state.scrollPosition = nil
         
-        return .merge(
-          .send(.scrollPositionChanged("bottom")),
-          .send(.startChatStream(chatMessages))
-        )
+        return .send(.startChatStream(chatMessages))
         
       case .startChatStream(let chatMessages, let enableWebSearch):
         let temperature = userDefaultsService.getTemperature()
@@ -275,9 +267,7 @@ struct Chat {
       case .streamingComplete(let reason):
         state.loadingState = .idle
         state.messageInputState.isLoading = false
-
-        state.scrollPosition = nil
-        return .send(.scrollPositionChanged("bottom"))
+        return .none
         
       case .streamingError(let errorMessage):
         state.loadingState = .idle
@@ -300,8 +290,7 @@ struct Chat {
       case .messages:
         return .none
         
-      case .scrollPositionChanged(let position):
-        state.scrollPosition = position
+      case .scrollPositionChanged:
         return .none
         
       case .webSearchStarted:
