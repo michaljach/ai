@@ -21,7 +21,7 @@ struct UserDefaultsService {
 
   // Default values
   private enum Defaults {
-    nonisolated static let groqAPIKey: String? = ConfigManager.groqAPIKey
+    nonisolated static let groqAPIKey: String? = nil
     nonisolated static let defaultModel = "groq/compound"
     nonisolated static let temperature = 0.7
     nonisolated static let maxTokens = 640
