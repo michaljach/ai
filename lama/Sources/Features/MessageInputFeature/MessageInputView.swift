@@ -13,6 +13,7 @@ struct MessageInputView: View {
   @Bindable var store: StoreOf<MessageInput>
   @FocusState private var isInputFocused: Bool
   @State private var selectedPhotoPickerItem: PhotosPickerItem?
+  var isNewChat: Bool = true
   
   var body: some View {
     VStack(spacing: 8) {
@@ -130,7 +131,9 @@ struct MessageInputView: View {
       .padding()
     }
     .onAppear {
-      isInputFocused = true
+      if isNewChat {
+        isInputFocused = true
+      }
     }
   }
 }

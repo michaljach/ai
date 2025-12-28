@@ -14,51 +14,49 @@ struct ChatView: View {
   var body: some View {
     VStack(spacing: 0) {
       // Messages List
-      ScrollViewReader { scrollProxy in
-        ScrollView {
-          LazyVStack(alignment: .leading, spacing: 0) {
-            ForEach(store.scope(state: \.visibleMessages, action: \.messages)) { store in
-              MessageView(store: store)
-                .id(store.id)
-            }
-
-            // Loading indicator based on state
-            switch store.loadingState {
-            case .loading:
-              LoadingIndicatorView(text: "Thinking...")
-                .id("loading")
-            
-            case .searchingWeb:
-              LoadingIndicatorView(text: "Searching the web...")
-                .id("searching")
-              
-            case .idle:
-              EmptyView()
-            }
-
-            if let error = store.errorMessage {
-              Text("Error: \(error)")
-                .font(.caption)
-                .foregroundColor(.red)
-                .padding(.horizontal)
-            }
-            
-            // Web search sources display
-            if !store.webSearchSources.isEmpty && store.isShowingWebSearchUI {
-              WebSearchSourcesView(sources: store.webSearchSources)
-                .padding(.top, 8)
-                .id("sources")
-            }
+      ScrollView {
+        LazyVStack(alignment: .leading, spacing: 0) {
+          ForEach(store.scope(state: \.visibleMessages, action: \.messages)) { store in
+            MessageView(store: store)
+              .id(store.id)
           }
-          .scrollTargetLayout()
+
+          // Loading indicator based on state
+          switch store.loadingState {
+          case .loading:
+            LoadingIndicatorView(text: "Thinking...")
+              .id("loading")
+          
+          case .searchingWeb:
+            LoadingIndicatorView(text: "Searching the web...")
+              .id("searching")
+            
+          case .idle:
+            EmptyView()
+          }
+
+          if let error = store.errorMessage {
+            Text("Error: \(error)")
+              .font(.caption)
+              .foregroundColor(.red)
+              .padding(.horizontal)
+          }
+          
+          // Web search sources display
+          if !store.webSearchSources.isEmpty && store.isShowingWebSearchUI {
+            WebSearchSourcesView(sources: store.webSearchSources)
+              .padding(.top, 8)
+              .id("sources")
+          }
         }
-        .scrollDismissesKeyboard(.interactively)
-        .defaultScrollAnchor(.bottom)
-        .safeAreaInset(edge: .bottom) {
-          MessageInputView(
-            store: store.scope(state: \.messageInputState, action: \.messageInput)
-          )
-        }
+        .scrollTargetLayout()
+      }
+      .scrollDismissesKeyboard(.interactively)
+      .safeAreaInset(edge: .bottom) {
+        MessageInputView(
+          store: store.scope(state: \.messageInputState, action: \.messageInput),
+          isNewChat: store.messages.isEmpty
+        )
       }
     }
     .navigationTitle("Chat")
