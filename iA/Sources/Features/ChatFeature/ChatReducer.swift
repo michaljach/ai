@@ -295,6 +295,18 @@ struct Chat {
       case .stopGeneration:
         state.loadingState = .idle
         state.messageInputState.isLoading = false
+        
+        // Mark the last user message as resendable since generation was stopped
+        if let lastUserMessageIndex = state.messages.lastIndex(where: { $0.role == .user }) {
+          state.messages[lastUserMessageIndex].canResend = true
+        }
+        
+        // Remove the incomplete assistant message if it exists
+        if let lastIndex = state.messages.indices.last,
+           state.messages[lastIndex].role == .assistant {
+          state.messages.remove(at: lastIndex)
+        }
+        
         return .cancel(id: CancelID.streaming)
         
       case .messageInput(.delegate(.stopGeneration)):
