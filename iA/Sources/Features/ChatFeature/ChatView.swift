@@ -14,44 +14,54 @@ struct ChatView: View {
   var body: some View {
     VStack(spacing: 0) {
       // Messages List
-      ScrollView {
-        LazyVStack(alignment: .leading, spacing: 0) {
-          ForEach(store.scope(state: \.visibleMessages, action: \.messages)) { store in
-            MessageView(store: store)
-              .id(store.id)
-          }
+      ScrollViewReader { scrollProxy in
+        ScrollView {
+          LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(store.scope(state: \.visibleMessages, action: \.messages)) { store in
+              MessageView(store: store)
+                .id(store.id)
+            }
 
-          // Loading indicator based on state
-          switch store.loadingState {
-          case .loading:
-            LoadingIndicatorView(text: "Thinking...")
-              .id("loading")
-          
-          case .searchingWeb:
-            LoadingIndicatorView(text: "Searching the web...")
-              .id("searching")
+            // Loading indicator based on state
+            switch store.loadingState {
+            case .loading:
+              LoadingIndicatorView(text: "Thinking...")
+                .id("loading")
             
-          case .idle:
-            EmptyView()
-          }
+            case .searchingWeb:
+              LoadingIndicatorView(text: "Searching the web...")
+                .id("searching")
+              
+            case .idle:
+              EmptyView()
+            }
 
-          if let error = store.errorMessage {
-            Text("Error: \(error)")
-              .font(.caption)
-              .foregroundColor(.red)
-              .padding(.horizontal)
+            if let error = store.errorMessage {
+              Text("Error: \(error)")
+                .font(.caption)
+                .foregroundColor(.red)
+                .padding(.horizontal)
+            }
+            
+            // Web search sources display
+            if !store.webSearchSources.isEmpty && store.isShowingWebSearchUI {
+              WebSearchSourcesView(sources: store.webSearchSources)
+                .padding(.top, 8)
+                .id("sources")
+            }
           }
-          
-          // Web search sources display
-          if !store.webSearchSources.isEmpty && store.isShowingWebSearchUI {
-            WebSearchSourcesView(sources: store.webSearchSources)
-              .padding(.top, 8)
-              .id("sources")
+          .scrollTargetLayout()
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .onChange(of: store.messages.count) { _, newCount in
+          // Scroll to the last message only when a user message is added
+          if newCount > 0, let lastMessage = store.messages.last, lastMessage.role == .user {
+            withAnimation {
+              scrollProxy.scrollTo(lastMessage.id, anchor: .bottom)
+            }
           }
         }
-        .scrollTargetLayout()
       }
-      .scrollDismissesKeyboard(.interactively)
       .safeAreaInset(edge: .bottom) {
         MessageInputView(
           store: store.scope(state: \.messageInputState, action: \.messageInput),
