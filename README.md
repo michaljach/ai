@@ -1,6 +1,16 @@
 # iA - AI Chat
 
+<div align="center">
+  <img src="images/logo.jpg" alt="iA Logo" width="200" height="200" />
+</div>
+
 A modern iOS chat application built with SwiftUI and The Composable Architecture that connects to [Groq API](https://console.groq.com/) for lightning-fast AI-powered conversations with web search and reasoning capabilities.
+
+## Preview
+
+<div align="center">
+  <img src="images/preview.png" alt="iA App Preview" width="400" />
+</div>
 
 ## Features
 
