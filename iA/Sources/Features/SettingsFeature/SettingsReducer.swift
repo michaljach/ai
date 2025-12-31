@@ -16,7 +16,7 @@ struct Settings {
     var groqAPIKey: String = ""
     var defaultModel: String = "openai/gpt-oss:120b"
     var temperature: Double = 0.7
-    var maxTokens: Int = 2048
+    var maxTokens: Int = 128
     var webSearchEnabled: Bool = true
     var availableModels: [String] = []
     var isLoadingModels: Bool = false
