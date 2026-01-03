@@ -37,7 +37,7 @@ struct MessageView: View {
                 .padding(.vertical, 12)
                 .padding(.horizontal, 16)
                 .background(Color.colorGray)
-                .clipShape(Capsule())
+                .clipShape(RoundedRectangle(cornerRadius: 22))
             }
             
             // Resend button
@@ -113,6 +113,16 @@ struct MessageView: View {
         id: UUID(),
         role: .user,
         content: "Hello, how are you?"
+      )) {
+        Message()
+      }
+    )
+    
+    MessageView(
+      store: Store(initialState: Message.State(
+        id: UUID(),
+        role: .user,
+        content: "Hello, how are you? This is multiline message to test rounding."
       )) {
         Message()
       }

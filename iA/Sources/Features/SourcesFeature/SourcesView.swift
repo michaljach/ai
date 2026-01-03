@@ -7,6 +7,7 @@
 
 import ComposableArchitecture
 import SwiftUI
+import MarkdownUI
 
 // Compact sources bar component
 struct SourcesBarView: View {
@@ -50,14 +51,12 @@ struct SourcesBarView: View {
 struct FaviconView: View {
   let url: String
   
-  @State private var actualDomain: String?
-  @State private var isResolvingDomain = false
-  
   private var faviconURL: URL? {
-    guard let domain = actualDomain else {
+    guard let baseURL = URL(string: url),
+          let host = baseURL.host else {
       return nil
     }
-    let faviconURLString = "https://www.google.com/s2/favicons?domain=\(domain)&sz=64"
+    let faviconURLString = "https://www.google.com/s2/favicons?domain=\(host)&sz=64"
     return URL(string: faviconURLString)
   }
   
@@ -89,9 +88,6 @@ struct FaviconView: View {
           }
         }
         .clipShape(Circle())
-      } else if isResolvingDomain {
-        ProgressView()
-          .scaleEffect(0.5)
       } else {
         Image(systemName: "globe")
           .resizable()
@@ -101,52 +97,90 @@ struct FaviconView: View {
       }
     }
     .frame(width: 20, height: 20)
-    .task {
-      await resolveDomain()
-    }
   }
+}
+
+// Source detail view showing full content in markdown
+struct SourceDetailView: View {
+  let source: WebSource
   
-  private func resolveDomain() async {
-    guard actualDomain == nil, !isResolvingDomain else { return }
-    
-    isResolvingDomain = true
-    defer { isResolvingDomain = false }
-    
-    // First try to extract domain directly
-    if let baseURL = URL(string: url),
-       let host = baseURL.host,
-       !host.contains("vertexaisearch.cloud.google.com") {
-      actualDomain = host
-      return
-    }
-    
-    // If it's a Google redirect URL, follow it to get actual domain
-    guard let redirectURL = URL(string: url),
-          redirectURL.host?.contains("vertexaisearch.cloud.google.com") == true else {
-      actualDomain = "google.com" // Fallback
-      return
-    }
-    
-    
-    do {
-      var request = URLRequest(url: redirectURL)
-      request.httpMethod = "HEAD"
-      request.timeoutInterval = 5
-      
-      let (_, response) = try await URLSession.shared.data(for: request)
-      
-      if let httpResponse = response as? HTTPURLResponse,
-         let location = httpResponse.value(forHTTPHeaderField: "Location") ?? httpResponse.url?.absoluteString,
-         let actualURL = URL(string: location),
-         let host = actualURL.host {
-        let cleanHost = host.replacingOccurrences(of: "www.", with: "")
-        actualDomain = cleanHost
-      } else {
-        actualDomain = "google.com"
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 16) {
+        // Title section
+        VStack(alignment: .leading, spacing: 8) {
+          HStack(spacing: 12) {
+            FaviconView(url: source.url)
+            
+            Text(source.title)
+              .font(.title3)
+              .fontWeight(.semibold)
+          }
+          
+          Link(destination: URL(string: source.url)!) {
+            HStack(spacing: 4) {
+              Text(source.url)
+                .font(.caption)
+                .foregroundColor(.blue)
+                .lineLimit(1)
+              
+              Image(systemName: "arrow.up.right")
+                .font(.caption2)
+                .foregroundColor(.blue)
+            }
+          }
+        }
+        .padding(.horizontal)
+        .padding(.top)
+        
+        Divider()
+        
+        // Content section
+        if let preview = source.preview {
+          VStack(alignment: .leading, spacing: 8) {
+            Text("Search Result")
+              .font(.headline)
+              .foregroundColor(.secondary)
+            
+            Markdown(preview)
+              .textSelection(.enabled)
+              .markdownTextStyle(\.text) {
+                ForegroundColor(.colorForeground)
+              }
+              .markdownTextStyle(\.code) {
+                FontFamilyVariant(.monospaced)
+                BackgroundColor(Color.colorForeground.opacity(0.08))
+              }
+              .markdownBlockStyle(\.codeBlock) { configuration in
+                configuration.label
+                  .padding()
+                  .background(Color.colorForeground.opacity(0.08))
+                  .cornerRadius(8)
+              }
+              .markdownTableBorderStyle(
+                .init(
+                  .horizontalBorders,
+                  color: .colorGray,
+                  strokeStyle: .init(lineWidth: 1)
+                )
+              )
+              .markdownTableBackgroundStyle(
+                .alternatingRows(Color.clear, Color.clear)
+              )
+          }
+          .padding(.horizontal)
+        } else {
+          Text("No preview available")
+            .font(.body)
+            .foregroundColor(.secondary)
+            .padding(.horizontal)
+        }
+        
+        Spacer()
       }
-    } catch {
-      actualDomain = "google.com"
     }
+    .navigationTitle("Source Detail")
+    .navigationBarTitleDisplayMode(.inline)
   }
 }
 
@@ -159,7 +193,9 @@ struct SourcesDetailSheet: View {
     NavigationStack {
       List {
         ForEach(store.sources) { source in
-          Link(destination: URL(string: source.url)!) {
+          NavigationLink {
+            SourceDetailView(source: source)
+          } label: {
             HStack(spacing: 12) {
               FaviconView(url: source.url)
               
@@ -178,10 +214,6 @@ struct SourcesDetailSheet: View {
               }
               
               Spacer()
-              
-              Image(systemName: "arrow.up.right")
-                .font(.caption)
-                .foregroundColor(.secondary)
             }
             .padding(.vertical, 4)
           }
@@ -207,12 +239,32 @@ struct SourcesDetailSheet: View {
 #Preview {
   SourcesBarView(sources: [WebSource(title: "Test", url: "")]) {}
   
+  SourceDetailView(
+    source: WebSource(
+      title: "Apple - Official Site",
+      url: "https://www.apple.com",
+      preview: "Apple is a technology company known for iPhone, iPad, and Mac products. Founded in 1976, it has become one of the most valuable companies in the world."
+    )
+  )
+  
   SourcesDetailSheet(
     store: Store(initialState: Sources.State(
       sources: [
-        WebSource(title: "Apple - Official Site", url: "https://www.apple.com"),
-        WebSource(title: "Wikipedia - The Free Encyclopedia", url: "https://wikipedia.org"),
-        WebSource(title: "GitHub - Where the world builds software", url: "https://github.com")
+        WebSource(
+          title: "Apple - Official Site", 
+          url: "https://www.apple.com",
+          preview: "Apple is a technology company known for iPhone, iPad, and Mac products"
+        ),
+        WebSource(
+          title: "Wikipedia - The Free Encyclopedia", 
+          url: "https://wikipedia.org",
+          preview: "Wikipedia is a free online encyclopedia with millions of articles"
+        ),
+        WebSource(
+          title: "GitHub - Where the world builds software", 
+          url: "https://github.com",
+          preview: "GitHub is a platform for version control and collaboration"
+        )
       ]
     )) {
       Sources()

@@ -63,6 +63,59 @@ struct WebSource: Equatable, Codable, Identifiable {
   }
 }
 
+// Helper function to decode vertexaisearch URLs
+private func decodeVertexSearchURL(_ urlString: String) async -> String {
+  // If it's not a vertexaisearch URL, return as-is
+  guard urlString.contains("vertexaisearch.cloud.google.com") else {
+    return urlString
+  }
+  
+  // Try to extract the actual URL from query parameters first (fast path)
+  if let components = URLComponents(string: urlString),
+     let queryItems = components.queryItems {
+    
+    // Check common parameter names for the actual destination URL
+    let parameterNames = ["url", "link", "q", "destination", "redirect", "target", "uri"]
+    for paramName in parameterNames {
+      if let actualURL = queryItems.first(where: { $0.name == paramName })?.value,
+         !actualURL.isEmpty {
+        return actualURL
+      }
+    }
+  }
+  
+  // If no query parameter found, follow the redirect to get actual URL
+  guard let url = URL(string: urlString) else {
+    return urlString
+  }
+  
+  do {
+    var request = URLRequest(url: url)
+    request.httpMethod = "HEAD"
+    request.timeoutInterval = 5
+    
+    let (_, response) = try await URLSession.shared.data(for: request)
+    
+    if let httpResponse = response as? HTTPURLResponse {
+      // Check for redirect location in headers
+      if let location = httpResponse.value(forHTTPHeaderField: "Location"),
+         !location.isEmpty {
+        return location
+      }
+      
+      // Check the final URL after redirects
+      if let finalURL = httpResponse.url?.absoluteString,
+         finalURL != urlString {
+        return finalURL
+      }
+    }
+  } catch {
+    // If redirect fails, return original URL
+  }
+  
+  return urlString
+}
+
 struct ChatResponse: Equatable {
   let text: String
   let sources: [WebSource]
@@ -334,16 +387,16 @@ private func streamGoogleAIMessage(
               
               struct GroundingChunk: Codable {
                 let web: WebChunk?
+                let retrievedContext: RetrievedContext?
                 
                 struct WebChunk: Codable {
                   let uri: String?
                   let title: String?
-                  
-                  // Log all fields to see what's available
-                  private enum CodingKeys: String, CodingKey {
-                    case uri
-                    case title
-                  }
+                }
+                
+                struct RetrievedContext: Codable {
+                  let uri: String?
+                  let title: String?
                 }
               }
               
@@ -424,12 +477,30 @@ private func streamGoogleAIMessage(
                 }
                 
                 for (index, chunk) in chunks.enumerated() {
-                  if let web = chunk.web,
-                     let uri = web.uri,
-                     let title = web.title {
+                  // Try retrievedContext first, then fall back to web
+                  var uri: String?
+                  var title: String?
+                  
+                  if let retrievedContext = chunk.retrievedContext {
+                    uri = retrievedContext.uri
+                    title = retrievedContext.title
+                  } else if let web = chunk.web {
+                    uri = web.uri
+                    title = web.title
+                  }
+                  
+                  if let uri = uri, let title = title {
+                    // Store with original URL first, will resolve later
                     let preview = chunkPreviews[index]
-                    let source = WebSource(title: title, url: uri, preview: preview)
-                    if !allSources.contains(where: { $0.url == uri }) {
+                    
+                    // If title looks like a URL, use it as fallback
+                    var finalURL = uri
+                    if title.hasPrefix("http://") || title.hasPrefix("https://") {
+                      finalURL = title
+                    }
+                    
+                    let source = WebSource(title: title, url: finalURL, preview: preview)
+                    if !allSources.contains(where: { $0.url == finalURL }) {
                       allSources.append(source)
                     }
                   }
@@ -440,8 +511,11 @@ private func streamGoogleAIMessage(
           }
         }
         
-        // Send completion with sources
-        continuation.yield(.complete(sources: allSources))
+        // Resolve vertexaisearch URLs to actual destinations
+        let resolvedSources = await resolveSourceURLs(allSources)
+        
+        // Send completion with resolved sources
+        continuation.yield(.complete(sources: resolvedSources))
         continuation.finish()
         
         
@@ -449,5 +523,29 @@ private func streamGoogleAIMessage(
         continuation.finish(throwing: error)
       }
     }
+  }
+}
+
+// Helper function to resolve all source URLs in parallel
+private func resolveSourceURLs(_ sources: [WebSource]) async -> [WebSource] {
+  await withTaskGroup(of: WebSource.self) { group in
+    for source in sources {
+      group.addTask {
+        let resolvedURL = await decodeVertexSearchURL(source.url)
+        return WebSource(
+          id: source.id,
+          title: source.title,
+          url: resolvedURL,
+          preview: source.preview
+        )
+      }
+    }
+    
+    var resolvedSources: [WebSource] = []
+    for await resolvedSource in group {
+      resolvedSources.append(resolvedSource)
+    }
+    
+    return resolvedSources
   }
 }
