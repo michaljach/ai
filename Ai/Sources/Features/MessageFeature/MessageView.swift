@@ -80,7 +80,7 @@ struct MessageView: View {
                 }
                 .padding()
                 .background(Color.colorGray)
-                .cornerRadius(22)
+                .cornerRadius(12)
                 .padding(.vertical)
             }
             .markdownTableBorderStyle(
