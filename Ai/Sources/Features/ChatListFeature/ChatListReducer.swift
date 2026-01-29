@@ -11,7 +11,9 @@ import Foundation
 @Reducer
 struct ChatList {
   @Dependency(\.googleAIService) var googleAIService
-  
+  @Dependency(\.chatStorageService) var chatStorageService
+  @Dependency(\.userDefaultsService) var userDefaultsService
+
   @Reducer
   enum Path {
     case chat(Chat)
@@ -38,6 +40,9 @@ struct ChatList {
     case selectChat(UUID)
     case chats(IdentifiedActionOf<Chat>)
     case path(StackActionOf<Path>)
+    case saveChats
+    case loadSavedChats
+    case savedChatsLoaded([Chat.State])
   }
   
   var body: some Reducer<State, Action> {
@@ -46,7 +51,7 @@ struct ChatList {
       case .initialize:
         return .merge(
           .send(.loadModels),
-          .send(.newChatButtonTapped)
+          .send(.loadSavedChats)
         )
       
       case .loadModels:
@@ -111,13 +116,18 @@ struct ChatList {
           if state.chats.contains(where: { $0.id == chat.id }) {
             state.chats[id: chat.id] = chat
           }
-          
+
           // Remove chat if it has no messages
           if chat.messages.isEmpty {
             state.chats.remove(id: chat.id)
           }
         }
-        return .none
+        // Auto-save after navigation change (if enabled)
+        return .run { [chats = state.chats] _ in
+          if userDefaultsService.getAutoSaveChatsEnabled() {
+            chatStorageService.saveChats(Array(chats))
+          }
+        }
         
       case .path:
         return .none
@@ -134,45 +144,113 @@ struct ChatList {
           }
           return false
         }
-        return .none
+        // Auto-save after deleting (if enabled)
+        return .run { [chats = state.chats] _ in
+          if userDefaultsService.getAutoSaveChatsEnabled() {
+            chatStorageService.saveChats(Array(chats))
+          }
+        }
 
       case .newChatButtonTapped:
-        
+
         // Clean up empty chats before creating new one
+        let hadEmptyChats = state.chats.contains { $0.messages.isEmpty }
         state.chats.removeAll { $0.messages.isEmpty }
-        
+
         let newChatId = UUID()
         var newChatItem = Chat.State(id: newChatId)
         newChatItem.modelPickerState.availableModels = state.availableModels
         state.chats.insert(newChatItem, at: 0)
-        
+
         // Only replace the path, don't append
         state.path.removeAll()
         state.path.append(.chat(newChatItem))
+
+        // Auto-save if we removed empty chats (if enabled)
+        if hadEmptyChats {
+          return .run { [chats = state.chats] _ in
+            if userDefaultsService.getAutoSaveChatsEnabled() {
+              chatStorageService.saveChats(Array(chats))
+            }
+          }
+        }
         return .none
 
       case .settingsButtonTapped:
-        
+
         // Clean up empty chats before going to settings
+        let hadEmptyChats = state.chats.contains { $0.messages.isEmpty }
         state.chats.removeAll { $0.messages.isEmpty }
-        
+
         // Replace the path with settings
         state.path.removeAll()
         state.path.append(.settings(Settings.State()))
+
+        // Auto-save if we removed empty chats (if enabled)
+        if hadEmptyChats {
+          return .run { [chats = state.chats] _ in
+            if userDefaultsService.getAutoSaveChatsEnabled() {
+              chatStorageService.saveChats(Array(chats))
+            }
+          }
+        }
         return .none
       
       case .selectChat(let id):
         guard let chat = state.chats[id: id] else { return .none }
-        
+
         // Clean up OTHER empty chats before selecting this one
+        let hadEmptyChats = state.chats.contains { $0.id != id && $0.messages.isEmpty }
         state.chats.removeAll { $0.id != id && $0.messages.isEmpty }
-        
+
         // Replace the path with selected chat
         state.path.removeAll()
         state.path.append(.chat(chat))
+
+        // Auto-save if we removed empty chats (if enabled)
+        if hadEmptyChats {
+          return .run { [chats = state.chats] _ in
+            if userDefaultsService.getAutoSaveChatsEnabled() {
+              chatStorageService.saveChats(Array(chats))
+            }
+          }
+        }
         return .none
 
       case .chats:
+        // Auto-save chats when they change (if enabled)
+        return .run { [chats = state.chats] _ in
+          if userDefaultsService.getAutoSaveChatsEnabled() {
+            chatStorageService.saveChats(Array(chats))
+          }
+        }
+
+      case .saveChats:
+        return .run { [chats = state.chats] _ in
+          chatStorageService.saveChats(Array(chats))
+        }
+
+      case .loadSavedChats:
+        return .run { send in
+          let savedChats = chatStorageService.loadChats()
+          await send(.savedChatsLoaded(savedChats))
+        }
+
+      case .savedChatsLoaded(let savedChats):
+        // Add saved chats to the list, avoiding duplicates
+        for savedChat in savedChats {
+          if !state.chats.contains(where: { $0.id == savedChat.id }) {
+            // Update the saved chat with current available models
+            var updatedChat = savedChat
+            updatedChat.modelPickerState.availableModels = state.availableModels
+            state.chats.append(updatedChat)
+          }
+        }
+
+        // If no chats exist after loading, create a new one
+        if state.chats.isEmpty {
+          return .send(.newChatButtonTapped)
+        }
         return .none
       }
     }

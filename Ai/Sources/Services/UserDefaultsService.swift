@@ -15,6 +15,7 @@ struct UserDefaultsService {
     static let defaultModel = "defaultModel"
     static let temperature = "temperature"
     static let maxTokens = "maxTokens"
+    static let autoSaveChatsEnabled = "autoSaveChatsEnabled"
   }
 
   // Default values
@@ -22,6 +23,7 @@ struct UserDefaultsService {
     nonisolated static let defaultModel = "models/gemini-3-flash-preview"
     nonisolated static let temperature = 0.7
     nonisolated static let maxTokens = 1024
+    nonisolated static let autoSaveChatsEnabled = true
   }
   
   var getDefaultModel: @Sendable () -> String
@@ -32,6 +34,9 @@ struct UserDefaultsService {
   
   var getMaxTokens: @Sendable () -> Int
   var setMaxTokens: @Sendable (Int) -> Void
+
+  var getAutoSaveChatsEnabled: @Sendable () -> Bool
+  var setAutoSaveChatsEnabled: @Sendable (Bool) -> Void
 
   var resetToDefaults: @Sendable () -> Void
 }
@@ -58,10 +63,19 @@ extension UserDefaultsService: DependencyKey {
     setMaxTokens: { value in
       UserDefaults.standard.set(value, forKey: Keys.maxTokens)
     },
+    getAutoSaveChatsEnabled: {
+      UserDefaults.standard.object(forKey: Keys.autoSaveChatsEnabled) != nil
+        ? UserDefaults.standard.bool(forKey: Keys.autoSaveChatsEnabled)
+        : Defaults.autoSaveChatsEnabled
+    },
+    setAutoSaveChatsEnabled: { value in
+      UserDefaults.standard.set(value, forKey: Keys.autoSaveChatsEnabled)
+    },
     resetToDefaults: {
       UserDefaults.standard.set(Defaults.defaultModel, forKey: Keys.defaultModel)
       UserDefaults.standard.set(Defaults.temperature, forKey: Keys.temperature)
       UserDefaults.standard.set(Defaults.maxTokens, forKey: Keys.maxTokens)
+      UserDefaults.standard.set(Defaults.autoSaveChatsEnabled, forKey: Keys.autoSaveChatsEnabled)
     }
   )
 
@@ -72,6 +86,8 @@ extension UserDefaultsService: DependencyKey {
     setTemperature: { _ in },
     getMaxTokens: { Defaults.maxTokens },
     setMaxTokens: { _ in },
+    getAutoSaveChatsEnabled: { Defaults.autoSaveChatsEnabled },
+    setAutoSaveChatsEnabled: { _ in },
     resetToDefaults: { }
   )
 }

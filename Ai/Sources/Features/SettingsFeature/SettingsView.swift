@@ -94,10 +94,14 @@ struct SettingsView: View {
           get: { store.webSearchEnabled },
           set: { store.send(.webSearchToggled($0)) }
         ))
+        Toggle("Auto-save Chats", isOn: Binding(
+          get: { store.autoSaveChatsEnabled },
+          set: { store.send(.autoSaveChatsToggled($0)) }
+        ))
       } header: {
         Text("Features")
       } footer: {
-        Text("When enabled, the AI can search the web for current information and real-time data.")
+        Text("When enabled, the AI can search the web for current information and real-time data. Auto-save stores your chats locally on your device.")
       }
 
       Section {

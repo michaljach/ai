@@ -13,56 +13,56 @@ final class UserDefaultsServiceTests: XCTestCase {
   func test_getDefaultModel_returnsDefaultValue() {
     let service = UserDefaultsService.testValue
     let model = service.getDefaultModel()
-    XCTAssertEqual(model, "openai/gpt-oss:120b")
+    XCTAssertEqual(model, "models/gemini-3-flash-preview")
   }
-  
+
   func test_getTemperature_returnsDefaultValue() {
     let service = UserDefaultsService.testValue
     let temperature = service.getTemperature()
     XCTAssertEqual(temperature, 0.7)
   }
-  
+
   func test_getMaxTokens_returnsDefaultValue() {
     let service = UserDefaultsService.testValue
     let maxTokens = service.getMaxTokens()
-    XCTAssertEqual(maxTokens, 640)
+    XCTAssertEqual(maxTokens, 1024)
   }
   
-  func test_isWebSearchEnabled_returnsDefaultValue() {
+  func test_getAutoSaveChatsEnabled_returnsDefaultValue() {
     let service = UserDefaultsService.testValue
-    let enabled = service.isWebSearchEnabled()
+    let enabled = service.getAutoSaveChatsEnabled()
     XCTAssertTrue(enabled)
   }
   
   func test_setAndGetDefaultModel() {
     var userDefaults: [String: Any] = [:]
-    
+
     let service = UserDefaultsService(
       getDefaultModel: {
-        userDefaults["defaultModel"] as? String ?? "openai/gpt-oss:120b"
+        userDefaults["defaultModel"] as? String ?? "models/gemini-3-flash-preview"
       },
       setDefaultModel: { value in
         userDefaults["defaultModel"] = value
       },
       getTemperature: { 0.7 },
       setTemperature: { _ in },
-      getMaxTokens: { 640 },
+      getMaxTokens: { 1024 },
       setMaxTokens: { _ in },
-      isWebSearchEnabled: { true },
-      setWebSearchEnabled: { _ in },
+      getAutoSaveChatsEnabled: { true },
+      setAutoSaveChatsEnabled: { _ in },
       resetToDefaults: { }
     )
-    
-    let newModel = "mixtral-8x7b-32768"
+
+    let newModel = "models/gemini-3-pro"
     service.setDefaultModel(newModel)
     XCTAssertEqual(service.getDefaultModel(), newModel)
   }
   
   func test_setAndGetTemperature() {
     var userDefaults: [String: Any] = [:]
-    
+
     let service = UserDefaultsService(
-      getDefaultModel: { "openai/gpt-oss:120b" },
+      getDefaultModel: { "models/gemini-3-flash-preview" },
       setDefaultModel: { _ in },
       getTemperature: {
         userDefaults["temperature"] as? Double ?? 0.7
@@ -70,65 +70,65 @@ final class UserDefaultsServiceTests: XCTestCase {
       setTemperature: { value in
         userDefaults["temperature"] = value
       },
-      getMaxTokens: { 640 },
+      getMaxTokens: { 1024 },
       setMaxTokens: { _ in },
-      isWebSearchEnabled: { true },
-      setWebSearchEnabled: { _ in },
+      getAutoSaveChatsEnabled: { true },
+      setAutoSaveChatsEnabled: { _ in },
       resetToDefaults: { }
     )
-    
+
     let newTemperature = 0.5
     service.setTemperature(newTemperature)
     XCTAssertEqual(service.getTemperature(), newTemperature)
   }
-  
+
   func test_setAndGetMaxTokens() {
     var userDefaults: [String: Any] = [:]
-    
+
     let service = UserDefaultsService(
-      getDefaultModel: { "openai/gpt-oss:120b" },
+      getDefaultModel: { "models/gemini-3-flash-preview" },
       setDefaultModel: { _ in },
       getTemperature: { 0.7 },
       setTemperature: { _ in },
       getMaxTokens: {
-        userDefaults["maxTokens"] as? Int ?? 640
+        userDefaults["maxTokens"] as? Int ?? 1024
       },
       setMaxTokens: { value in
         userDefaults["maxTokens"] = value
       },
-      isWebSearchEnabled: { true },
-      setWebSearchEnabled: { _ in },
+      getAutoSaveChatsEnabled: { true },
+      setAutoSaveChatsEnabled: { _ in },
       resetToDefaults: { }
     )
-    
-    let newMaxTokens = 2000
+
+    let newMaxTokens = 2048
     service.setMaxTokens(newMaxTokens)
     XCTAssertEqual(service.getMaxTokens(), newMaxTokens)
   }
-  
-  func test_setAndGetWebSearchEnabled() {
+
+  func test_setAndGetAutoSaveChatsEnabled() {
     var userDefaults: [String: Any] = [:]
-    
+
     let service = UserDefaultsService(
-      getDefaultModel: { "openai/gpt-oss:120b" },
+      getDefaultModel: { "models/gemini-3-flash-preview" },
       setDefaultModel: { _ in },
       getTemperature: { 0.7 },
       setTemperature: { _ in },
-      getMaxTokens: { 640 },
+      getMaxTokens: { 1024 },
       setMaxTokens: { _ in },
-      isWebSearchEnabled: {
-        userDefaults["webSearchEnabled"] as? Bool ?? true
+      getAutoSaveChatsEnabled: {
+        userDefaults["autoSaveChatsEnabled"] as? Bool ?? true
       },
-      setWebSearchEnabled: { value in
-        userDefaults["webSearchEnabled"] = value
+      setAutoSaveChatsEnabled: { value in
+        userDefaults["autoSaveChatsEnabled"] = value
       },
       resetToDefaults: { }
     )
-    
-    service.setWebSearchEnabled(false)
-    XCTAssertFalse(service.isWebSearchEnabled())
-    
-    service.setWebSearchEnabled(true)
-    XCTAssertTrue(service.isWebSearchEnabled())
+
+    service.setAutoSaveChatsEnabled(false)
+    XCTAssertFalse(service.getAutoSaveChatsEnabled())
+
+    service.setAutoSaveChatsEnabled(true)
+    XCTAssertTrue(service.getAutoSaveChatsEnabled())
   }
 }

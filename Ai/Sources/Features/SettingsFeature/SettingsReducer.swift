@@ -22,6 +22,7 @@ struct Settings {
     var isLoadingModels: Bool = false
     var googleAIAPIKey: String = ""
     var webSearchEnabled: Bool = true
+    var autoSaveChatsEnabled: Bool = true
 
     init(userDefaultsService: UserDefaultsService = .liveValue) {
       // Load from UserDefaults service
@@ -29,9 +30,10 @@ struct Settings {
       self.temperature = userDefaultsService.getTemperature()
       self.maxTokens = userDefaultsService.getMaxTokens()
       self.googleAIAPIKey = UserDefaults.standard.string(forKey: "googleAIAPIKey") ?? ""
-      self.webSearchEnabled = UserDefaults.standard.object(forKey: "webSearchEnabled") != nil 
-        ? UserDefaults.standard.bool(forKey: "webSearchEnabled") 
+      self.webSearchEnabled = UserDefaults.standard.object(forKey: "webSearchEnabled") != nil
+        ? UserDefaults.standard.bool(forKey: "webSearchEnabled")
         : true
+      self.autoSaveChatsEnabled = userDefaultsService.getAutoSaveChatsEnabled()
     }
   }
 
@@ -45,6 +47,7 @@ struct Settings {
     case modelsLoadFailed
     case googleAIAPIKeyChanged(String)
     case webSearchToggled(Bool)
+    case autoSaveChatsToggled(Bool)
   }
 
   var body: some Reducer<State, Action> {
@@ -70,6 +73,7 @@ struct Settings {
         state.defaultModel = userDefaultsService.getDefaultModel()
         state.temperature = userDefaultsService.getTemperature()
         state.maxTokens = userDefaultsService.getMaxTokens()
+        state.autoSaveChatsEnabled = userDefaultsService.getAutoSaveChatsEnabled()
         return .none
       
       case .loadModels:
@@ -104,6 +108,11 @@ struct Settings {
       case .webSearchToggled(let enabled):
         state.webSearchEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: "webSearchEnabled")
+        return .none
+
+      case .autoSaveChatsToggled(let enabled):
+        state.autoSaveChatsEnabled = enabled
+        userDefaultsService.setAutoSaveChatsEnabled(enabled)
         return .none
       }
     }
