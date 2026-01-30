@@ -24,6 +24,8 @@ struct ChatListView: View {
     }
     .onAppear {
       store.send(.initialize)
+      // Set reference for app lifecycle notifications
+      AppDelegate.sharedStore = store
     }
   }
   

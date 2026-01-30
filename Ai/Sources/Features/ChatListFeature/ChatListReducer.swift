@@ -26,6 +26,7 @@ struct ChatList {
     var path = StackState<Path.State>()
     var availableModels: [AIModel] = []
     var isLoadingModels = false
+    var saveDebounceTask: Task<Void, Never>?
   }
 
   enum Action {
@@ -41,9 +42,14 @@ struct ChatList {
     case chats(IdentifiedActionOf<Chat>)
     case path(StackActionOf<Path>)
     case saveChats
+    case saveChatsDebounced
     case loadSavedChats
     case savedChatsLoaded([Chat.State])
+    case appWillResignActive
+    case appWillTerminate
   }
+
+  private static let saveDebounceInterval: UInt64 = 500_000_000 // 500ms in nanoseconds
   
   var body: some Reducer<State, Action> {
     Reduce { state, action in
@@ -109,6 +115,18 @@ struct ChatList {
           }
         }
         return .none
+        
+      case .path(.element(id: let id, action: .chat(.streamComplete))),
+           .path(.element(id: let id, action: .chat(.messageError))),
+           .path(.element(id: let id, action: .chat(.stopGeneration))):
+        // Sync chat state back to collection when streaming completes, errors, or stops
+        if case let .chat(chat) = state.path[id: id] {
+          if state.chats.contains(where: { $0.id == chat.id }) {
+            state.chats[id: chat.id] = chat
+          }
+        }
+        // Save after streaming completes/errors/stops
+        return .send(.saveChatsDebounced)
 
       case .path(.popFrom(id: let id)):
         // Sync chat state back when popping from navigation
@@ -122,12 +140,8 @@ struct ChatList {
             state.chats.remove(id: chat.id)
           }
         }
-        // Auto-save after navigation change (if enabled)
-        return .run { [chats = state.chats] _ in
-          if userDefaultsService.getAutoSaveChatsEnabled() {
-            chatStorageService.saveChats(Array(chats))
-          }
-        }
+        // Auto-save after navigation change (if enabled) - debounced
+        return .send(.saveChatsDebounced)
         
       case .path:
         return .none
@@ -144,12 +158,8 @@ struct ChatList {
           }
           return false
         }
-        // Auto-save after deleting (if enabled)
-        return .run { [chats = state.chats] _ in
-          if userDefaultsService.getAutoSaveChatsEnabled() {
-            chatStorageService.saveChats(Array(chats))
-          }
-        }
+        // Auto-save after deleting (if enabled) - debounced
+        return .send(.saveChatsDebounced)
 
       case .newChatButtonTapped:
 
@@ -166,13 +176,9 @@ struct ChatList {
         state.path.removeAll()
         state.path.append(.chat(newChatItem))
 
-        // Auto-save if we removed empty chats (if enabled)
+        // Auto-save if we removed empty chats (if enabled) - debounced
         if hadEmptyChats {
-          return .run { [chats = state.chats] _ in
-            if userDefaultsService.getAutoSaveChatsEnabled() {
-              chatStorageService.saveChats(Array(chats))
-            }
-          }
+          return .send(.saveChatsDebounced)
         }
         return .none
 
@@ -186,13 +192,9 @@ struct ChatList {
         state.path.removeAll()
         state.path.append(.settings(Settings.State()))
 
-        // Auto-save if we removed empty chats (if enabled)
+        // Auto-save if we removed empty chats (if enabled) - debounced
         if hadEmptyChats {
-          return .run { [chats = state.chats] _ in
-            if userDefaultsService.getAutoSaveChatsEnabled() {
-              chatStorageService.saveChats(Array(chats))
-            }
-          }
+          return .send(.saveChatsDebounced)
         }
         return .none
       
@@ -207,27 +209,44 @@ struct ChatList {
         state.path.removeAll()
         state.path.append(.chat(chat))
 
-        // Auto-save if we removed empty chats (if enabled)
+        // Auto-save if we removed empty chats (if enabled) - debounced
         if hadEmptyChats {
-          return .run { [chats = state.chats] _ in
-            if userDefaultsService.getAutoSaveChatsEnabled() {
-              chatStorageService.saveChats(Array(chats))
-            }
-          }
+          return .send(.saveChatsDebounced)
         }
         return .none
 
       case .chats:
-        // Auto-save chats when they change (if enabled)
-        return .run { [chats = state.chats] _ in
-          if userDefaultsService.getAutoSaveChatsEnabled() {
-            chatStorageService.saveChats(Array(chats))
-          }
-        }
+        // Auto-save chats when they change (if enabled) - debounced
+        return .send(.saveChatsDebounced)
 
       case .saveChats:
+        // Immediate save (e.g., for app lifecycle events)
         return .run { [chats = state.chats] _ in
           chatStorageService.saveChats(Array(chats))
+        }
+
+      case .saveChatsDebounced:
+        // Cancel any existing debounce task
+        state.saveDebounceTask?.cancel()
+        
+        // Create new debounced save task
+        let task = Task {
+          try? await Task.sleep(nanoseconds: Self.saveDebounceInterval)
+          if !Task.isCancelled {
+            await Task { @MainActor in
+              // This will be handled by the next action
+            }.value
+          }
+        }
+        state.saveDebounceTask = task
+        
+        return .run { [chats = state.chats] _ in
+          try? await Task.sleep(nanoseconds: Self.saveDebounceInterval)
+          if !Task.isCancelled {
+            if userDefaultsService.getAutoSaveChatsEnabled() {
+              chatStorageService.saveChats(Array(chats))
+            }
+          }
         }
 
       case .loadSavedChats:
@@ -252,6 +271,22 @@ struct ChatList {
           return .send(.newChatButtonTapped)
         }
         return .none
+        
+      case .appWillResignActive:
+        // Save immediately when app goes to background
+        return .run { [chats = state.chats] _ in
+          if userDefaultsService.getAutoSaveChatsEnabled() {
+            chatStorageService.saveChats(Array(chats))
+          }
+        }
+        
+      case .appWillTerminate:
+        // Save immediately when app terminates
+        return .run { [chats = state.chats] _ in
+          if userDefaultsService.getAutoSaveChatsEnabled() {
+            chatStorageService.saveChats(Array(chats))
+          }
+        }
       }
     }
     .forEach(\.path, action: \.path)
