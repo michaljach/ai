@@ -348,7 +348,13 @@ private func streamGoogleAIMessage(
         
         
         if httpResponse.statusCode != 200 {
-          throw ChatError.apiError("HTTP \(httpResponse.statusCode)")
+          // Read error message from response body
+          var errorBody = ""
+          for try await line in bytes.lines {
+            errorBody += line + "\n"
+          }
+          let errorMessage = errorBody.isEmpty ? "HTTP \(httpResponse.statusCode)" : "HTTP \(httpResponse.statusCode): \(errorBody)"
+          throw ChatError.apiError(errorMessage)
         }
         
         struct StreamResponse: Codable {

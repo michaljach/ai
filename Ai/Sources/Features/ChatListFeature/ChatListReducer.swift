@@ -170,6 +170,8 @@ struct ChatList {
         let newChatId = UUID()
         var newChatItem = Chat.State(id: newChatId)
         newChatItem.modelPickerState.availableModels = state.availableModels
+        // Apply user's default model setting from UserDefaults
+        newChatItem.modelPickerState.selectedModel = userDefaultsService.getDefaultModel()
         state.chats.insert(newChatItem, at: 0)
 
         // Only replace the path, don't append
