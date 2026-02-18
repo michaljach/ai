@@ -105,16 +105,15 @@ struct ChatList {
         state.isLoadingModels = false
         return .none
         
-      case .path(.element(id: _, action: .chat(.messageInput(.sendButtonTapped)))):
-        // Sync chat state back to collection after sending a message
-        for pathElement in state.path {
-          if case let .chat(chat) = pathElement {
-            if state.chats.contains(where: { $0.id == chat.id }) {
-              state.chats[id: chat.id] = chat
-            }
+      case .path(.element(id: let id, action: .chat(.messageInput(.delegate(.sendMessage))))),
+           .path(.element(id: let id, action: .chat(.sendMessage(_, images: _)))):
+        // Sync chat state back to collection after message send starts
+        if case let .chat(chat) = state.path[id: id] {
+          if state.chats.contains(where: { $0.id == chat.id }) {
+            state.chats[id: chat.id] = chat
           }
         }
-        return .none
+        return .send(.saveChatsDebounced)
 
       case .path(.element(id: let id, action: .chat(.modelPicker(.modelSelected(_))))):
         // Keep chat list in sync with model changes from an opened chat

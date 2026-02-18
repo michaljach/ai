@@ -108,6 +108,9 @@ struct Chat {
         for index in state.messages.indices {
           state.messages[index].canResend = false
         }
+
+        // Lock model once conversation has started
+        state.modelPickerState.isDisabled = true
         
         
         let userMessage = Message.State(
@@ -196,6 +199,9 @@ struct Chat {
         for index in state.messages.indices {
           state.messages[index].canResend = false
         }
+
+        // Lock model once conversation has started
+        state.modelPickerState.isDisabled = true
         
         let userMessage = Message.State(
           id: UUID(),
