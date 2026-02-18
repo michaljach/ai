@@ -170,7 +170,8 @@ struct Chat {
       case .messageInput:
         return .none
         
-      case .modelPicker:
+      case .modelPicker(.modelSelected(let model)):
+        state.model = model
         return .none
         
       case .message(.element(id: let id, action: .delegate(.resendMessage(let content, let images)))):

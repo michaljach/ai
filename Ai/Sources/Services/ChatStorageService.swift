@@ -42,7 +42,7 @@ struct ChatStorageService {
   private static func toStoredChat(_ chat: Chat.State) -> StoredChat {
     StoredChat(
       id: chat.id,
-      model: chat.model,
+      model: chat.modelPickerState.selectedModel,
       messages: chat.messages.map { message in
         StoredChat.StoredMessage(
           id: message.id,
