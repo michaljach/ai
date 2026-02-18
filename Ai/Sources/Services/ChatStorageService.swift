@@ -61,6 +61,7 @@ struct ChatStorageService {
     chatState.model = stored.model
     chatState.modelPickerState.selectedModel = stored.model
     chatState.modelPickerState.availableModels = availableModels
+    chatState.modelPickerState.isDisabled = !stored.messages.isEmpty
 
     for storedMessage in stored.messages {
       let messageState = Message.State(
