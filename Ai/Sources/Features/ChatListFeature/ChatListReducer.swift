@@ -115,6 +115,24 @@ struct ChatList {
           }
         }
         return .none
+
+      case .path(.element(id: let id, action: .chat(.modelPicker(.modelSelected(_))))):
+        // Keep chat list in sync with model changes from an opened chat
+        if case let .chat(chat) = state.path[id: id] {
+          if state.chats.contains(where: { $0.id == chat.id }) {
+            state.chats[id: chat.id] = chat
+          }
+        }
+        return .send(.saveChatsDebounced)
+
+      case .path(.element(id: let id, action: .chat(.modelSelected(_)))):
+        // Keep compatibility with direct model selection actions
+        if case let .chat(chat) = state.path[id: id] {
+          if state.chats.contains(where: { $0.id == chat.id }) {
+            state.chats[id: chat.id] = chat
+          }
+        }
+        return .send(.saveChatsDebounced)
         
       case .path(.element(id: let id, action: .chat(.streamComplete))),
            .path(.element(id: let id, action: .chat(.messageError))),
