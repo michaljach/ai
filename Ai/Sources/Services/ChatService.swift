@@ -332,11 +332,11 @@ private func streamGoogleAIMessage(
             temperature: temperature,
             maxOutputTokens: maxTokens
           ),
-          tools: webSearchEnabled ? [
+          tools: [
             GoogleAIRequest.Tool(
               googleSearch: GoogleAIRequest.Tool.GoogleSearch()
             )
-          ] : nil
+          ]
         )
         
         request.httpBody = try JSONEncoder().encode(googleRequest)
