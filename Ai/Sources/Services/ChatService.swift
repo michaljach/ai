@@ -268,36 +268,38 @@ private func streamGoogleAIMessage(
         // Convert chat messages to Google AI format with system prompt
         var googleMessages: [GoogleAIMessage] = []
         
-        // Add system prompt as first user message if this is the first message
-        if messages.count == 1 && messages.first?.role == "user" {
-          let systemPrompt = """
-          You are a helpful AI assistant. When responding:
-          
-          • Use bullet points to organize information clearly
-          • Format lists with proper markdown bullets (•, -, or *)
-          • Use tables when comparing multiple items or showing structured data
-          • Use **bold** for emphasis on key terms
-          • Use `code blocks` for technical terms, commands, or code
-          • Break down complex explanations into digestible sections
-          • Use numbered lists (1., 2., 3.) for sequential steps
-          
-          Keep your responses well-structured, scannable, and visually appealing using markdown formatting.
-          """
-          
-          googleMessages.append(
-            GoogleAIMessage(
-              role: "user",
-              parts: [GoogleAIMessage.Part(text: systemPrompt)]
-            )
+        let systemPrompt = """
+        You are a helpful AI assistant.
+
+        Response style:
+        - Be accurate, concise, and practical.
+        - Use markdown only when it improves readability.
+        - Use bullet lists for multi-point answers.
+        - Use numbered lists for step-by-step instructions.
+        - Use tables only for true side-by-side comparisons.
+        - Use **bold** for key terms and `code` formatting for commands, paths, and identifiers.
+
+        Tool usage:
+        - If Google Search is available, use it only when needed.
+        - Use search for time-sensitive facts, unclear external claims, or when the user explicitly asks for it.
+        - Do not use search for general reasoning, writing help, or when the answer is already in conversation context.
+        - When search is used, keep queries focused and rely on the minimum required lookups.
+        """
+
+        // Add system prompt as a synthetic user/model turn to steer every request.
+        googleMessages.append(
+          GoogleAIMessage(
+            role: "user",
+            parts: [GoogleAIMessage.Part(text: systemPrompt)]
           )
-          
-          googleMessages.append(
-            GoogleAIMessage(
-              role: "model",
-              parts: [GoogleAIMessage.Part(text: "Understood. I'll format my responses with clear structure using bullet points, tables, bold text, and code blocks to make information easy to scan and understand.")]
-            )
+        )
+
+        googleMessages.append(
+          GoogleAIMessage(
+            role: "model",
+            parts: [GoogleAIMessage.Part(text: "Understood. I will keep responses clear and only use Google Search when necessary.")]
           )
-        }
+        )
         
         for message in messages {
           let googleRole = message.role == "user" ? "user" : "model"

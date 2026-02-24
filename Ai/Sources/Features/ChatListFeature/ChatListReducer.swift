@@ -146,8 +146,10 @@ struct ChatList {
         return .send(.saveChatsDebounced)
 
       case .path(.popFrom(id: let id)):
+        let poppedElement = state.path[id: id]
+
         // Sync chat state back when popping from navigation
-        if case let .chat(chat) = state.path[id: id] {
+        if case let .chat(chat)? = poppedElement {
           if state.chats.contains(where: { $0.id == chat.id }) {
             state.chats[id: chat.id] = chat
           }
@@ -157,8 +159,17 @@ struct ChatList {
             state.chats.remove(id: chat.id)
           }
         }
+
+        var effects: [Effect<Action>] = [.send(.saveChatsDebounced)]
+
+        // When returning from settings after entering an API key,
+        // lazily load models if needed so model picker becomes available.
+        if case .settings? = poppedElement, shouldLoadModels(state) {
+          effects.append(.send(.loadModels))
+        }
+
         // Auto-save after navigation change (if enabled) - debounced
-        return .send(.saveChatsDebounced)
+        return .merge(effects)
         
       case .path:
         return .none
@@ -195,11 +206,20 @@ struct ChatList {
         state.path.removeAll()
         state.path.append(.chat(newChatItem))
 
+        var effects: [Effect<Action>] = []
+
         // Auto-save if we removed empty chats (if enabled) - debounced
         if hadEmptyChats {
-          return .send(.saveChatsDebounced)
+          effects.append(.send(.saveChatsDebounced))
         }
-        return .none
+
+        // If models were not loaded yet (common on first run before API key),
+        // try loading them now so the chat model picker can appear.
+        if shouldLoadModels(state) {
+          effects.append(.send(.loadModels))
+        }
+
+        return effects.isEmpty ? .none : .merge(effects)
 
       case .settingsButtonTapped:
 
@@ -313,3 +333,14 @@ struct ChatList {
 }
 
 extension ChatList.Path.State: Equatable {}
+
+private extension ChatList {
+  func shouldLoadModels(_ state: State) -> Bool {
+    guard state.availableModels.isEmpty, !state.isLoadingModels else {
+      return false
+    }
+
+    let apiKey = googleAIService.apiKey().trimmingCharacters(in: .whitespacesAndNewlines)
+    return !apiKey.isEmpty
+  }
+}

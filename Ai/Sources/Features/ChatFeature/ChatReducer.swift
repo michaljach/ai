@@ -99,7 +99,7 @@ struct Chat {
         guard !messageText.isEmpty || !messageImages.isEmpty else { return .none }
         
         
-        let webSearchEnabled = UserDefaults.standard.bool(forKey: "webSearchEnabled")
+        let webSearchEnabled = webSearchEnabledSetting()
         state.loadingState = webSearchEnabled ? .webSearching : .loading
         state.messageInputState.isLoading = true
         state.errorMessage = nil
@@ -148,7 +148,7 @@ struct Chat {
         return .run { [messages = apiMessages, model = state.modelPickerState.selectedModel, messageId = assistantMessageId] send in
           await send(.messageSent(messageText))
           do {
-            let webSearchEnabled = UserDefaults.standard.bool(forKey: "webSearchEnabled")
+            let webSearchEnabled = webSearchEnabledSetting()
             let stream = chatService.streamMessage(messages, model, 0.7, 8192, webSearchEnabled)
             
             for try await event in stream {
@@ -190,7 +190,7 @@ struct Chat {
         return .none
         
       case .sendMessage(let message, let images):
-        let webSearchEnabled = UserDefaults.standard.bool(forKey: "webSearchEnabled")
+        let webSearchEnabled = webSearchEnabledSetting()
         state.loadingState = webSearchEnabled ? .webSearching : .loading
         state.messageInputState.isLoading = true
         state.errorMessage = nil
@@ -233,7 +233,7 @@ struct Chat {
         return .run { [messages = apiMessages, model = state.modelPickerState.selectedModel, messageId = assistantMessageId] send in
           await send(.messageSent(message))
           do {
-            let webSearchEnabled = UserDefaults.standard.bool(forKey: "webSearchEnabled")
+            let webSearchEnabled = webSearchEnabledSetting()
             let stream = chatService.streamMessage(messages, model, 0.7, 8192, webSearchEnabled)
             
             for try await event in stream {
@@ -325,4 +325,11 @@ struct Chat {
       ModelPicker()
     }
   }
+}
+
+private func webSearchEnabledSetting() -> Bool {
+  let userDefaults = UserDefaults.standard
+  return userDefaults.object(forKey: "webSearchEnabled") != nil
+    ? userDefaults.bool(forKey: "webSearchEnabled")
+    : true
 }
